@@ -1,0 +1,101 @@
+services:
+
+
+  telegram-drive:
+
+    container_name: telegram-drive
+    
+    build:
+
+      context: .
+
+      dockerfile: Dockerfile
+
+
+    restart: unless-stopped
+
+
+    working_dir: /app
+
+
+    volumes:
+
+      - ./app:/app
+
+      - ./data:/data
+
+
+    env_file:
+
+      - .env
+
+
+    ports:
+
+      - "8080:8000"
+
+
+    networks:
+
+      - telegram-net
+
+   
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+
+  proxy:
+
+
+    image: ghcr.io/sagernet/sing-box:latest
+
+
+    container_name: telegram-drive-proxy
+
+
+    restart: unless-stopped
+
+
+    profiles:
+
+      - proxy
+
+
+    volumes:
+
+      - ./sing-box/config.json:/etc/sing-box/config.json:ro
+
+
+    command:
+
+      - run
+      - -c
+      - /etc/sing-box/config.json
+
+
+    networks:
+
+
+      telegram-net:
+
+
+        aliases:
+
+
+          - proxy
+
+
+
+
+
+networks:
+
+
+  telegram-net:
+
+
+    driver: bridge

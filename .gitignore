@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.env
+
+*.log
+
+.DS_Store
+
+.vscode/
+
+.idea/
+
+download/
+tmp/
+
+# runtime data
+data/accounts/
+*.session
+*.session-journal
+*.db
+data/cache
+# backup files
+*.bak
+*.bak.*
