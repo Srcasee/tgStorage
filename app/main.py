@@ -10,6 +10,7 @@ from telegram.scanner import scanner_loop
 from database import get_connection
 
 from app.v2.api.router import router as v2_router
+from app.v2.indexer.worker import TelegramIndexWorker
 from app.v2.telegram.lifecycle import create_runtime_lifecycle
 
 TG_API_ID = int(os.getenv("TG_API_ID", "0"))
@@ -20,6 +21,10 @@ app.include_router(files_router)
 app.include_router(v2_router)
 
 v2_runtime_lifecycle = create_runtime_lifecycle()
+v2_index_worker = TelegramIndexWorker(
+    interval=int(os.getenv("V2_INDEX_INTERVAL", "300")),
+    batch_size=int(os.getenv("V2_INDEX_BATCH_SIZE", "200")),
+)
 scanner_task = None
 
 
@@ -38,9 +43,10 @@ async def startup():
     global scanner_task
 
     await v2_runtime_lifecycle.startup()
+    v2_index_worker.start()
 
-    # Keep the legacy scanner optional. v2 API startup must not depend on
-    # legacy sessions being present.
+    # Keep the legacy scanner optional. v2 indexing is independent from the
+    # legacy files database and uses the v2 Telegram account/source models.
     clients = get_clients()
     if not clients:
         scanner_task = None
@@ -88,6 +94,8 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     global scanner_task
+
+    await v2_index_worker.stop()
 
     if scanner_task:
         scanner_task.cancel()
