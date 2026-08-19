@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from email.utils import formataddr
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +12,7 @@ from app.download.resource_resolver import ResourceResolver
 from app.download.telethon_provider import TelethonFileProvider
 from app.download.telegram import TelegramStreamBackend
 from app.download.telegram_reader import TelegramChunkReader
-from app.telegram.client_provider import DatabaseTelegramClientProvider
+from app.telegram.client_provider import DatabaseTelegramClientProvider, TelegramClientAuthorizationError
 from app.telegram.runtime_registry import get_pool, get_runtime
 
 router = APIRouter(tags=["download"])
@@ -47,16 +50,21 @@ def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
     return start, min(end, size - 1)
 
 
-async def _get_backend(session: AsyncSession) -> TelegramStreamBackend:
-    try:
-        client_provider = DatabaseTelegramClientProvider(
-            session=session,
-            runtime=get_runtime(),
-            pool=get_pool(),
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+def _content_disposition(filename: str, resource_id: int) -> str:
+    """Build a safe attachment header with an ASCII fallback and UTF-8 filename."""
+    name = filename.strip() or str(resource_id)
+    fallback = "".join(ch if 32 <= ord(ch) < 127 and ch not in '\\"' else "_" for ch in name)
+    fallback = fallback.strip() or str(resource_id)
+    encoded = quote(name, safe="!#$&+-.^_`|~")
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
+
+async def _get_backend(session: AsyncSession) -> TelegramStreamBackend:
+    client_provider = DatabaseTelegramClientProvider(
+        session=session,
+        runtime=get_runtime(),
+        pool=get_pool(),
+    )
     provider = TelethonFileProvider(client_provider)
     reader = TelegramChunkReader(provider)
     return TelegramStreamBackend(ResourceResolver(session), reader)
@@ -99,13 +107,15 @@ async def download_resource(
     try:
         backend = await _get_backend(session)
         stream = backend.stream(resource_id, start=start, limit=length)
+    except TelegramClientAuthorizationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     headers = {
         "Accept-Ranges": "bytes",
         "Content-Length": str(length),
-        "Content-Disposition": f'attachment; filename="{location.filename or resource_id}"',
+        "Content-Disposition": _content_disposition(location.filename, resource_id),
     }
     if status_code == 206:
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
