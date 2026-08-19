@@ -1,6 +1,7 @@
 from pathlib import Path
 
 
+
 def test_application_imports_and_exposes_mvp_routes():
     from app.main import app
 
@@ -31,3 +32,15 @@ def test_alembic_cli_files_exist():
     assert (root / "alembic.ini").is_file()
     assert (root / "alembic" / "env.py").is_file()
     assert (root / "alembic" / "versions" / "0001_initial_schema.py").is_file()
+
+
+async def test_startup_skips_scanner_when_disabled(monkeypatch):
+    import app.main as main
+
+    main.index_worker_enabled = False
+
+    def fail_start():
+        raise AssertionError("scanner must not start when disabled")
+
+    monkeypatch.setattr(main.index_worker, "start", fail_start)
+    await main.startup()
