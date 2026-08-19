@@ -4,13 +4,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from app.files.api import router as files_router
 from app.api.router import router as api_router
 from app.indexer.worker import TelegramIndexWorker
 from app.telegram.lifecycle import create_runtime_lifecycle
 
 app = FastAPI()
-app.include_router(files_router)
 app.include_router(api_router)
 
 runtime_lifecycle = create_runtime_lifecycle()
