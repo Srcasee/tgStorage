@@ -1,22 +1,28 @@
-"""Telegram related entities for v2.
+"""Telegram account and source ORM models."""
 
-ORM implementation will be added after migration strategy is finalized.
-"""
+from sqlalchemy import BigInteger, Boolean, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
-from dataclasses import dataclass
-
-
-@dataclass
-class TelegramAccount:
-    id: int | None = None
-    name: str = ""
-    session_path: str = ""
-    enabled: bool = True
+from .base import Base
 
 
-@dataclass
-class TelegramSource:
-    id: int | None = None
-    account_id: int | None = None
-    chat_id: int | None = None
-    title: str = ""
+class TelegramAccount(Base):
+    __tablename__ = "telegram_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    session_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(32), default="unknown")
+
+
+class TelegramSource(Base):
+    __tablename__ = "telegram_sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chat_type: Mapped[str] = mapped_column(String(32), default="channel")
+    title: Mapped[str] = mapped_column(String(256), default="")
+    sync_mode: Mapped[str] = mapped_column(String(32), default="incremental")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
