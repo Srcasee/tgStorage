@@ -1,15 +1,19 @@
 """Resource API endpoints for tgStorage v2."""
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.v2.api.dependencies import get_db_session
 from app.v2.search.service import ResourceSearchService
 
 router = APIRouter(prefix="/api/v2/resources", tags=["resources"])
 
 
-async def get_search_service():
-    """Placeholder dependency, wired to database session in application bootstrap."""
-    raise NotImplementedError
+async def get_search_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> ResourceSearchService:
+    """Build search service with the current database session."""
+    return ResourceSearchService(session)
 
 
 @router.get("/search")
@@ -17,12 +21,14 @@ async def search_resources(
     q: str | None = Query(default=None),
     category_id: int | None = Query(default=None),
     resource_type: str | None = Query(default=None),
+    limit: int = Query(default=50, le=200),
     service: ResourceSearchService = Depends(get_search_service),
 ):
     resources = await service.search(
         query=q,
         category_id=category_id,
         resource_type=resource_type,
+        limit=limit,
     )
 
     return [
