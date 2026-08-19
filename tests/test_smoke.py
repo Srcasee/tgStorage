@@ -4,11 +4,10 @@ from pathlib import Path
 def test_application_imports_and_exposes_mvp_routes():
     from app.main import app
 
-    routes = {
-        route.path
-        for route in app.routes
-        if hasattr(route, "path")
-    }
+    # FastAPI may keep nested include_router entries as internal router
+    # objects in app.routes. OpenAPI is the stable flattened view of the
+    # public HTTP contract and does not require application startup.
+    routes = set(app.openapi()["paths"])
     assert "/" in routes
     assert "/web" in routes
     assert "/api/v2/resources/search" in routes
