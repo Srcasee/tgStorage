@@ -62,7 +62,7 @@ def _content_disposition(filename: str, resource_id: int) -> str:
     return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
-async def _get_backend(session: AsyncSession, account_id: int | None) -> TelegramStreamBackend:
+async def _get_backend(session: AsyncSession, account_id: int | None) -> tuple[TelegramStreamBackend, TelethonFileProvider]:
     client_provider = DatabaseTelegramClientProvider(
         session=session,
         runtime=get_runtime(),
@@ -73,7 +73,7 @@ async def _get_backend(session: AsyncSession, account_id: int | None) -> Telegra
     await client_provider.get_client(account_id)
     provider = TelethonFileProvider(client_provider)
     reader = TelegramChunkReader(provider)
-    return TelegramStreamBackend(ResourceResolver(session), reader)
+    return TelegramStreamBackend(ResourceResolver(session), reader), provider
 
 
 @router.get("/resources/{resource_id}/download")
@@ -111,7 +111,14 @@ async def download_resource(
 
     length = end - start + 1
     try:
-        backend = await _get_backend(session, location.account_id)
+        backend, provider = await _get_backend(session, location.account_id)
+        await provider.validate_message(
+            chat_id=location.chat_id,
+            message_id=location.message_id,
+            account_id=location.account_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except TelegramClientAuthorizationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
