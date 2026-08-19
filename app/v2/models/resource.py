@@ -1,6 +1,6 @@
 """Resource metadata ORM model for tgStorage v2."""
 
-from sqlalchemy import BigInteger, Integer, String
+from sqlalchemy import BigInteger, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
@@ -15,6 +15,18 @@ class Resource(Base):
     filename: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     extension: Mapped[str] = mapped_column(String(32), default="")
     mime_type: Mapped[str] = mapped_column(String(128), default="")
+
+    # Lightweight analyzer metadata.
+    # Avoid separate tag tables to keep deployment simple.
+    resource_type: Mapped[str] = mapped_column(
+        String(32),
+        default="unknown",
+    )
+    tags_json: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     size: Mapped[int] = mapped_column(BigInteger, default=0)
     hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
