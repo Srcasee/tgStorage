@@ -12,7 +12,7 @@ from app.v2.download.telegram_reader import TelegramChunkReader
 from app.v2.telegram.client_provider import DatabaseTelegramClientProvider
 from app.v2.telegram.runtime_registry import get_pool, get_runtime
 
-router = APIRouter(prefix="/api/v2/resources", tags=["download"])
+router = APIRouter(tags=["download"])
 
 
 def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
@@ -62,7 +62,7 @@ async def _get_backend(session: AsyncSession) -> TelegramStreamBackend:
     return TelegramStreamBackend(ResourceResolver(session), reader)
 
 
-@router.get("/{resource_id}/download")
+@router.get("/resources/{resource_id}/download")
 async def download_resource(
     resource_id: int,
     range_header: str | None = Header(default=None, alias="Range"),
@@ -99,11 +99,7 @@ async def download_resource(
     length = end - start + 1
     try:
         backend = await _get_backend(session)
-        stream = backend.stream(
-            resource_id,
-            start=start,
-            limit=length,
-        )
+        stream = backend.stream(resource_id, start=start, limit=length)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
