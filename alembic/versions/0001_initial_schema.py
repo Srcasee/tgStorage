@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=256), nullable=False, server_default=""),
         sa.Column("sync_mode", sa.String(length=32), nullable=False, server_default="incremental"),
         sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.ForeignKeyConstraint(["account_id"], ["telegram_accounts.id"], ondelete="RESTRICT"),
     )
     op.create_index("ix_telegram_sources_account_id", "telegram_sources", ["account_id"])
     op.create_index("ix_telegram_sources_chat_id", "telegram_sources", ["chat_id"])
@@ -44,6 +45,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("parent_id", sa.Integer(), nullable=True),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
+        sa.ForeignKeyConstraint(["parent_id"], ["categories.id"], ondelete="RESTRICT"),
     )
     op.create_index("ix_categories_parent_id", "categories", ["parent_id"])
 
@@ -72,6 +74,8 @@ def upgrade() -> None:
         sa.Column("hash", sa.String(length=128), nullable=True),
         sa.Column("category_id", sa.Integer(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="active"),
+        sa.ForeignKeyConstraint(["source_id"], ["telegram_sources.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["category_id"], ["categories.id"], ondelete="RESTRICT"),
     )
     op.create_index("ix_resources_source_message", "resources", ["source_id", "telegram_message_id"], unique=True)
     op.create_index("ix_resources_category_id", "resources", ["category_id"])
