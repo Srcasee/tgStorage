@@ -1,337 +1,63 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-
 <head>
-<meta charset="UTF-8">
-
-<title>Telegram Drive</title>
-
-<style>
-
-body {
-    font-family: Arial, sans-serif;
-    margin: 30px;
-}
-
-input {
-    width: 300px;
-    padding: 8px;
-}
-
-button {
-    padding: 6px 12px;
-    margin: 5px;
-    cursor: pointer;
-}
-
-.card {
-    border: 1px solid #ddd;
-    padding: 15px;
-    margin: 15px 0;
-    border-radius: 8px;
-}
-
-.name {
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-
-.info {
-    color: #666;
-    margin-bottom: 10px;
-}
-
-video {
-    margin-top: 10px;
-    max-width: 800px;
-}
-
-.video-box {
-    margin-top: 10px;
-}
-
-</style>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tgStorage</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    form { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    input { flex: 1; padding: .7rem; }
+    button { padding: .7rem 1rem; cursor: pointer; }
+    .resource { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: .6rem 0; }
+    .meta { color: #666; font-size: .9rem; margin-top: .35rem; }
+  </style>
 </head>
-
-
 <body>
+  <h1>tgStorage</h1>
+  <form id="search-form">
+    <input id="query" name="q" placeholder="搜索文件名…" autocomplete="off">
+    <button type="submit">搜索</button>
+  </form>
+  <div id="status"></div>
+  <div id="results"></div>
 
+  <script>
+    const form = document.getElementById('search-form');
+    const query = document.getElementById('query');
+    const results = document.getElementById('results');
+    const status = document.getElementById('status');
 
-<h2>
-Telegram Drive
-</h2>
-
-
-<input
-id="search"
-placeholder="搜索文件"
-/>
-
-
-<button onclick="searchFiles()">
-搜索
-</button>
-
-
-<button onclick="loadFiles()">
-刷新
-</button>
-
-
-<div id="files"></div>
-
-
-
-<script>
-
-
-async function loadFiles(){
-
-
-    let res =
-        await fetch(
-            "/files?page=1&size=50"
-        );
-
-
-    let data =
-        await res.json();
-
-
-    renderFiles(
-        data.data?.items || []
-    );
-
-}
-
-
-
-async function searchFiles(){
-
-
-    let q =
-        document.getElementById(
-            "search"
-        ).value.trim();
-
-
-    if(!q){
-
-        loadFiles();
-
-        return;
-
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-
-    let res =
-        await fetch(
-            "/files/search?q="
-            +
-            encodeURIComponent(q)
-        );
-
-
-    let data =
-        await res.json();
-
-
-    renderFiles(
-        data.data?.items || data
-    );
-
-}
-
-
-
-function renderFiles(files){
-
-
-    let box =
-        document.getElementById(
-            "files"
-        );
-
-
-    box.innerHTML = "";
-
-
-    for(
-        let f of files
-    ){
-
-
-        let size =
-            (
-                f.size
-                /
-                1024
-                /
-                1024
-            )
-            .toFixed(2)
-            +
-            " MB";
-
-
-
-        let card =
-        document.createElement(
-            "div"
-        );
-
-
-        card.className =
-            "card";
-
-
-
-        let html = `
-
-
-<div class="name">
-${f.filename}
-</div>
-
-
-<div class="info">
-${size}
-|
-${f.mime_type}
-</div>
-
-
-<a href="/files/${f.id}/download">
-
-<button>
-下载
-</button>
-
-</a>
-
-
-`;
-
-
-
-        if(
-            f.mime_type &&
-            f.mime_type.startsWith(
-                "video"
-            )
-        ){
-
-            html += `
-
-<button
-onclick="playVideo(this, ${f.id}, '${f.mime_type}')">
-
-播放
-
-</button>
-
-
-<div class="video-box"></div>
-
-`;
-
-        }
-
-
-
-        card.innerHTML =
-            html;
-
-
-        box.appendChild(
-            card
-        );
-
-
+    async function search(q = '') {
+      status.textContent = '搜索中…';
+      results.replaceChildren();
+      const response = await fetch('/api/v2/resources/search?q=' + encodeURIComponent(q));
+      if (!response.ok) throw new Error('搜索失败: HTTP ' + response.status);
+      const resources = await response.json();
+      status.textContent = resources.length ? `找到 ${resources.length} 个资源` : '没有找到资源';
+      for (const item of resources) {
+        const node = document.createElement('div');
+        node.className = 'resource';
+        node.innerHTML = `
+          <strong>${escapeHtml(item.filename || '(未命名)')}</strong>
+          <div class="meta">${escapeHtml(item.resource_type)} · ${escapeHtml(item.mime_type)} · ${Number(item.size || 0).toLocaleString()} bytes</div>
+          <p><a href="/api/v2/resources/${encodeURIComponent(item.id)}/download">下载</a></p>
+        `;
+        results.appendChild(node);
+      }
     }
 
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      try { await search(query.value.trim()); }
+      catch (error) { status.textContent = error.message; }
+    });
 
-}
-
-
-
-
-function playVideo(
-    btn,
-    id,
-    mime
-){
-
-
-    let box =
-        btn.parentElement.querySelector(
-            ".video-box"
-        );
-
-
-    if(
-        box.querySelector("video")
-    ){
-
-        return;
-
-    }
-
-
-
-    let video =
-        document.createElement(
-            "video"
-        );
-
-
-    video.controls =
-        true;
-
-
-    video.playsInline =
-        true;
-
-
-    video.preload =
-        "metadata";
-
-
-    video.src =
-        "/files/"
-        +
-        id
-        +
-        "/stream";
-
-
-
-    video.type =
-        mime;
-
-
-    box.appendChild(
-        video
-    );
-
-
-    video.play()
-    .catch(
-        ()=>{}
-    );
-
-
-}
-
-
-
-loadFiles();
-
-
-</script>
-
-
+    search().catch(error => { status.textContent = error.message; });
+  </script>
 </body>
-
 </html>
