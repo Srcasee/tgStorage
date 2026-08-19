@@ -1,4 +1,5 @@
 from pathlib import Path
+import asyncio
 
 
 
@@ -34,13 +35,17 @@ def test_alembic_cli_files_exist():
     assert (root / "alembic" / "versions" / "0001_initial_schema.py").is_file()
 
 
-async def test_startup_skips_scanner_when_disabled(monkeypatch):
+def test_startup_skips_scanner_when_disabled(monkeypatch):
     import app.main as main
 
+    previous = main.index_worker_enabled
     main.index_worker_enabled = False
 
     def fail_start():
         raise AssertionError("scanner must not start when disabled")
 
     monkeypatch.setattr(main.index_worker, "start", fail_start)
-    await main.startup()
+    try:
+        asyncio.run(main.startup())
+    finally:
+        main.index_worker_enabled = previous
