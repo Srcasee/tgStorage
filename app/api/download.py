@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from email.utils import formataddr
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -12,7 +11,10 @@ from app.download.resource_resolver import ResourceResolver
 from app.download.telethon_provider import TelethonFileProvider
 from app.download.telegram import TelegramStreamBackend
 from app.download.telegram_reader import TelegramChunkReader
-from app.telegram.client_provider import DatabaseTelegramClientProvider, TelegramClientAuthorizationError
+from app.telegram.client_provider import (
+    DatabaseTelegramClientProvider,
+    TelegramClientAuthorizationError,
+)
 from app.telegram.runtime_registry import get_pool, get_runtime
 
 router = APIRouter(tags=["download"])
@@ -36,8 +38,7 @@ def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
             raise HTTPException(status_code=416, detail="invalid Range header") from exc
         if suffix <= 0 or size <= 0:
             raise HTTPException(status_code=416, detail="range not satisfiable")
-        start = max(size - suffix, 0)
-        return start, size - 1
+        return max(size - suffix, 0), size - 1
 
     try:
         start = int(start_text)
@@ -51,20 +52,25 @@ def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
 
 
 def _content_disposition(filename: str, resource_id: int) -> str:
-    """Build a safe attachment header with an ASCII fallback and UTF-8 filename."""
+    """Build a safe attachment header with ASCII and UTF-8 filenames."""
     name = filename.strip() or str(resource_id)
-    fallback = "".join(ch if 32 <= ord(ch) < 127 and ch not in '\\"' else "_" for ch in name)
-    fallback = fallback.strip() or str(resource_id)
+    fallback = "".join(
+        ch if 32 <= ord(ch) < 127 and ch not in '\\"' else "_"
+        for ch in name
+    ).strip() or str(resource_id)
     encoded = quote(name, safe="!#$&+-.^_`|~")
     return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
-async def _get_backend(session: AsyncSession) -> TelegramStreamBackend:
+async def _get_backend(session: AsyncSession, account_id: int | None) -> TelegramStreamBackend:
     client_provider = DatabaseTelegramClientProvider(
         session=session,
         runtime=get_runtime(),
         pool=get_pool(),
     )
+    # Authenticate before returning StreamingResponse. Errors raised only
+    # while iterating the response body cannot change its HTTP status safely.
+    await client_provider.get_client(account_id)
     provider = TelethonFileProvider(client_provider)
     reader = TelegramChunkReader(provider)
     return TelegramStreamBackend(ResourceResolver(session), reader)
@@ -105,13 +111,13 @@ async def download_resource(
 
     length = end - start + 1
     try:
-        backend = await _get_backend(session)
-        stream = backend.stream(resource_id, start=start, limit=length)
+        backend = await _get_backend(session, location.account_id)
     except TelegramClientAuthorizationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    stream = backend.stream(resource_id, start=start, limit=length)
     headers = {
         "Accept-Ranges": "bytes",
         "Content-Length": str(length),
