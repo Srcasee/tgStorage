@@ -64,9 +64,17 @@ class TelegramResourceIndexer:
             kwargs["min_id"] = cursor
 
         async for message in client.iter_messages(chat_id, **kwargs):
+            message_id = int(message.id) if getattr(message, "id", None) else 0
+
+            # Telethon normally enforces min_id, but the scanner must keep its
+            # own boundary guarantee to protect against retries, mocked clients,
+            # cached results, and future client implementations.
+            if not full_reconcile and message_id <= cursor:
+                continue
+
             if not is_indexable_message(message):
                 continue
-            message_id = int(message.id)
+
             max_message_id = max(max_message_id, message_id)
             seen_ids.add(message_id)
             resource = existing.get(message_id)
