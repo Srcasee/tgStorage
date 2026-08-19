@@ -4,7 +4,11 @@ from pathlib import Path
 def test_application_imports_and_exposes_mvp_routes():
     from app.main import app
 
-    routes = {route.path for route in app.routes}
+    routes = {
+        route.path
+        for route in app.routes
+        if hasattr(route, "path")
+    }
     assert "/" in routes
     assert "/web" in routes
     assert "/api/v2/resources/search" in routes
