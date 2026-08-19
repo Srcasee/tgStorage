@@ -2,9 +2,10 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.v2.core.database import async_session_factory
+from app.v2.core.database import SessionLocal
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session_factory() as session:
+    """Yield one database session per request."""
+    async with SessionLocal() as session:
         yield session
