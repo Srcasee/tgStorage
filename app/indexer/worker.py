@@ -1,4 +1,4 @@
-"""Small background worker for the Telegram indexer."""
+"""Small background worker for the Telegram resource indexer."""
 
 import asyncio
 
@@ -42,7 +42,7 @@ class TelegramIndexWorker:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                print(f"[INDEX] {exc!r}", flush=True)
+                print(f"[INDEX] cycle failed: {exc!r}", flush=True)
             await asyncio.sleep(self.interval)
 
     async def scan_once(self) -> None:
@@ -55,10 +55,24 @@ class TelegramIndexWorker:
             pool = get_pool()
 
             for source in sources:
-                provider = DatabaseTelegramClientProvider(session, runtime, pool)
-                client = await provider.get_client(source.account_id)
-                count = await TelegramResourceIndexer(session).index_source(
-                    client, source, self.batch_size
-                )
-                if count:
-                    print(f"[INDEX] source={source.id} indexed={count}", flush=True)
+                try:
+                    provider = DatabaseTelegramClientProvider(session, runtime, pool)
+                    client = await provider.get_client(source.account_id)
+                    count = await TelegramResourceIndexer(session).index_source(
+                        client, source, self.batch_size
+                    )
+                    if count:
+                        print(
+                            f"[INDEX] source={source.id} indexed={count}",
+                            flush=True,
+                        )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    # One broken account/source must not prevent other sources
+                    # from being indexed during the same cycle.
+                    await session.rollback()
+                    print(
+                        f"[INDEX] source={source.id} failed: {exc!r}",
+                        flush=True,
+                    )
