@@ -37,19 +37,20 @@ async def web():
 async def startup():
     global scanner_task
 
-    # v2 runtime is deliberately lazy: no Telegram connection is made here.
-    v2_runtime_lifecycle.start()
+    await v2_runtime_lifecycle.startup()
 
+    # Keep the legacy scanner optional. v2 API startup must not depend on
+    # legacy sessions being present.
     clients = get_clients()
     if not clients:
-        raise RuntimeError("No Telegram sessions found")
+        scanner_task = None
+        return
 
     for name, tg_client in clients.items():
         await tg_client.connect()
         authorized = await tg_client.is_user_authorized()
         if not authorized:
             await tg_client.disconnect()
-            continue
 
     async def run_scanners():
         tasks = []
@@ -76,9 +77,7 @@ async def startup():
                 except Exception as exc:
                     print(f"[SCAN] {account_name} crashed: {exc!r}", flush=True)
 
-            tasks.append(
-                asyncio.create_task(run_one(row[0], name, tg_client))
-            )
+            tasks.append(asyncio.create_task(run_one(row[0], name, tg_client)))
 
         if tasks:
             await asyncio.gather(*tasks)
@@ -101,4 +100,4 @@ async def shutdown():
         if tg_client.is_connected():
             await tg_client.disconnect()
 
-    await v2_runtime_lifecycle.stop()
+    await v2_runtime_lifecycle.shutdown()
