@@ -33,7 +33,7 @@ class DatabaseTelegramClientProvider:
             account.status = "unauthorized"
             await self.session.commit()
             await self.runtime.disconnect(account.id)
-            self.pool.unregister(account.id)
+            self.pool.remove(account.id)
             raise TelegramClientAuthorizationError(
                 f"Telegram account {account.id} is not authorized"
             )
