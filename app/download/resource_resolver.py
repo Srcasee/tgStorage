@@ -1,8 +1,12 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.resource import Resource
 from app.models.telegram import TelegramSource
+
 
 @dataclass(frozen=True)
 class TelegramResourceLocation:
@@ -14,6 +18,7 @@ class TelegramResourceLocation:
     filename: str = ""
     mime_type: str = "application/octet-stream"
 
+
 class ResourceResolver:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -22,13 +27,17 @@ class ResourceResolver:
         resource = await self.session.get(Resource, resource_id)
         if resource is None:
             raise LookupError("resource not found")
+        if resource.status != "active":
+            raise PermissionError("resource is not available")
         if resource.telegram_message_id is None or resource.source_id is None:
             raise LookupError("resource has no Telegram message mapping")
+
         source = await self.session.get(TelegramSource, resource.source_id)
         if source is None:
             raise LookupError("Telegram source not found")
         if not source.enabled:
             raise PermissionError("Telegram source is disabled")
+
         return TelegramResourceLocation(
             resource_id=resource.id,
             chat_id=source.chat_id,
