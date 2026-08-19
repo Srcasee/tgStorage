@@ -54,6 +54,8 @@ class TelegramResourceScanner:
                 filename=filename,
                 extension=analysis["extension"],
                 mime_type=message.file.mime_type or "",
+                resource_type=analysis["resource_type"],
+                tags_json=analysis["tags"],
                 size=message.file.size or 0,
                 status="active",
                 created_at=datetime.now(timezone.utc),
