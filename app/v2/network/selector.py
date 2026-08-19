@@ -1,24 +1,26 @@
-"""Network plugin selection layer for tgStorage v2.
+"""Network plugin selection layer for tgStorage v2."""
 
-Network/proxy handling stays optional and hot-swappable.
-"""
+from __future__ import annotations
 
-from typing import Any, Optional
+from app.v2.network.plugin import DirectNetworkPlugin, NetworkPlugin
 
 
 class NetworkSelector:
-    def __init__(self):
-        self._plugins: list[Any] = []
+    """Small registry; proxy implementations can be added/removed at runtime."""
 
-    def register(self, plugin: Any):
-        self._plugins.append(plugin)
+    def __init__(self) -> None:
+        self._plugins: dict[str, NetworkPlugin] = {}
+        self.register(DirectNetworkPlugin())
 
-    def select(self, network_type: Optional[str] = None):
-        for plugin in self._plugins:
-            if not getattr(plugin, "enabled", True):
-                continue
-            if network_type is None:
-                return plugin
-            if getattr(plugin, "type", None) == network_type:
-                return plugin
-        return None
+    def register(self, plugin: NetworkPlugin) -> None:
+        self._plugins[plugin.type] = plugin
+
+    def unregister(self, network_type: str) -> None:
+        if network_type != "direct":
+            self._plugins.pop(network_type, None)
+
+    def select(self, network_type: str | None = None) -> NetworkPlugin | None:
+        plugin = self._plugins.get(network_type or "direct")
+        if plugin is None or not plugin.enabled:
+            return None
+        return plugin
