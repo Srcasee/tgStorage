@@ -30,12 +30,12 @@ scanner_task = None
 
 @app.get("/")
 async def home():
-    return FileResponse("/app/web/index.html")
+    return FileResponse("/app/v2/web/index.html")
 
 
 @app.get("/web")
 async def web():
-    return FileResponse("/app/web/index.html")
+    return FileResponse("/app/v2/web/index.html")
 
 
 @app.on_event("startup")
