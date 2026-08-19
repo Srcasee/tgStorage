@@ -1,6 +1,5 @@
-"""Alembic environment for tgStorage v2."""
+"""Alembic environment for tgStorage."""
 
-from app.v2.models import Base
+from app.models import Base
 
-# Alembic uses this metadata for autogeneration.
 target_metadata = Base.metadata

@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.v2.core.dependencies import get_db_session
-from app.v2.download.resource_resolver import ResourceResolver
-from app.v2.download.telethon_provider import TelethonFileProvider
-from app.v2.download.telegram import TelegramStreamBackend
-from app.v2.download.telegram_reader import TelegramChunkReader
-from app.v2.telegram.client_provider import DatabaseTelegramClientProvider
-from app.v2.telegram.runtime_registry import get_pool, get_runtime
+from app.core.dependencies import get_db_session
+from app.download.resource_resolver import ResourceResolver
+from app.download.telethon_provider import TelethonFileProvider
+from app.download.telegram import TelegramStreamBackend
+from app.download.telegram_reader import TelegramChunkReader
+from app.telegram.client_provider import DatabaseTelegramClientProvider
+from app.telegram.runtime_registry import get_pool, get_runtime
 
 router = APIRouter(tags=["download"])
 
@@ -68,7 +68,6 @@ async def download_resource(
     range_header: str | None = Header(default=None, alias="Range"),
     session: AsyncSession = Depends(get_db_session),
 ):
-    """Stream a Telegram-backed resource with HTTP Range support."""
     resolver = ResourceResolver(session)
 
     try:

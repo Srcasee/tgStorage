@@ -1,49 +1,25 @@
 """DB-backed Telegram client provider."""
-
 from __future__ import annotations
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.v2.models.account import TelegramAccount
-from app.v2.telegram.client_pool import TelegramClientPool
-from app.v2.telegram.runtime import TelegramClientRuntime
-
+from app.models.account import TelegramAccount
+from app.telegram.client_pool import TelegramClientPool
+from app.telegram.runtime import TelegramClientRuntime
 
 class DatabaseTelegramClientProvider:
-    """Resolve an enabled account and return a connected Telethon client."""
-
-    def __init__(
-        self,
-        session: AsyncSession,
-        runtime: TelegramClientRuntime,
-        pool: TelegramClientPool,
-    ) -> None:
-        self.session = session
-        self.runtime = runtime
-        self.pool = pool
+    def __init__(self, session: AsyncSession, runtime: TelegramClientRuntime, pool: TelegramClientPool) -> None:
+        self.session, self.runtime, self.pool = session, runtime, pool
 
     async def get_client(self, account_id: int | None = None):
+        stmt = select(TelegramAccount).where(TelegramAccount.enabled.is_(True))
         if account_id is not None:
-            result = await self.session.execute(
-                select(TelegramAccount).where(
-                    TelegramAccount.id == account_id,
-                    TelegramAccount.enabled.is_(True),
-                )
-            )
-            account = result.scalar_one_or_none()
+            stmt = stmt.where(TelegramAccount.id == account_id)
         else:
-            result = await self.session.execute(
-                select(TelegramAccount)
-                .where(TelegramAccount.enabled.is_(True))
-                .order_by(TelegramAccount.id)
-                .limit(1)
-            )
-            account = result.scalar_one_or_none()
-
+            stmt = stmt.order_by(TelegramAccount.id).limit(1)
+        result = await self.session.execute(stmt)
+        account = result.scalar_one_or_none()
         if account is None:
             raise RuntimeError("no enabled Telegram account is available")
-
         client = await self.runtime.connect(account)
         self.pool.register(account.id, client, status="online")
         account.status = "online"

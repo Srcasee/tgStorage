@@ -1,10 +1,8 @@
-"""Resource API endpoints for tgStorage v2."""
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.v2.api.dependencies import get_db_session
-from app.v2.search.service import ResourceSearchService
+from app.core.dependencies import get_db_session
+from app.search.service import ResourceSearchService
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 

@@ -1,14 +1,14 @@
-"""Small background worker for the v2 Telegram indexer."""
+"""Small background worker for the Telegram indexer."""
 
 import asyncio
 
 from sqlalchemy import select
 
-from app.v2.core.database import SessionLocal
-from app.v2.models.telegram import TelegramSource
-from app.v2.telegram.client_provider import DatabaseTelegramClientProvider
-from app.v2.telegram.runtime_registry import get_runtime, get_pool
-from app.v2.indexer.service import TelegramResourceIndexer
+from app.core.database import SessionLocal
+from app.models.telegram import TelegramSource
+from app.telegram.client_provider import DatabaseTelegramClientProvider
+from app.telegram.runtime_registry import get_runtime, get_pool
+from app.indexer.service import TelegramResourceIndexer
 
 
 class TelegramIndexWorker:
@@ -42,7 +42,7 @@ class TelegramIndexWorker:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                print(f"[V2 INDEX] {exc!r}", flush=True)
+                print(f"[INDEX] {exc!r}", flush=True)
             await asyncio.sleep(self.interval)
 
     async def scan_once(self) -> None:
@@ -57,10 +57,8 @@ class TelegramIndexWorker:
             for source in sources:
                 provider = DatabaseTelegramClientProvider(session, runtime, pool)
                 client = await provider.get_client(source.account_id)
-                indexer = TelegramResourceIndexer(session)
-                count = await indexer.index_source(client, source, self.batch_size)
+                count = await TelegramResourceIndexer(session).index_source(
+                    client, source, self.batch_size
+                )
                 if count:
-                    print(
-                        f"[V2 INDEX] source={source.id} indexed={count}",
-                        flush=True,
-                    )
+                    print(f"[INDEX] source={source.id} indexed={count}", flush=True)
