@@ -41,11 +41,7 @@ class FakeClient:
 
 class FakeAnalyzer:
     def analyze(self, filename, mime_type):
-        return {
-            "extension": ".txt",
-            "resource_type": "document",
-            "tags": [],
-        }
+        return {"extension": ".txt", "resource_type": "document", "tags": []}
 
 
 class FakeClassifier:
@@ -96,7 +92,9 @@ def test_incremental_scanner_is_source_bound_and_advances_cursor():
             assert source.last_scanned_message_id == 12
 
             resources = list((await session.execute(Resource.__table__.select())).mappings())
-            assert [row["telegram_message_id"] for row in resources] == [12]
+            assert [(row["telegram_chat_id"], row["telegram_message_id"]) for row in resources] == [
+                (-1001, 12)
+            ]
 
         await engine.dispose()
 
@@ -120,6 +118,7 @@ def test_full_mode_reconciles_only_the_configured_source():
             await session.flush()
             old = Resource(
                 source_id=source.id,
+                telegram_chat_id=-1002,
                 telegram_message_id=20,
                 filename="deleted.txt",
                 extension=".txt",
