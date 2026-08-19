@@ -12,13 +12,29 @@ It is not a Telegram dialog crawler and not a download engine.
 
 ## 2. Baseline at 7a15c75
 
-`app/telegram/scanner.py` is a compatibility entry point. It imports `TelegramResourceIndexer` from `app.indexer.service`; the active scanning implementation therefore lives in the indexer service. The file documents the intended boundaries and explicitly states that arbitrary historical dialogs must not be enumerated. fileciteturn696file0
+`app/telegram/scanner.py` is a compatibility entry point. It imports `TelegramResourceIndexer` from `app.indexer.service`; the active scanning implementation therefore lives in the indexer service. The old dialog-enumerating implementation remains in `scanner_legacy.py` for reference/rollback.
 
-The indexer validates the configured entity with `client.get_entity(source.chat_id)`, then calls `client.iter_messages(source.chat_id, ...)`. This is intentionally source-scoped. Incremental mode uses the source cursor as `min_id`; full mode is explicit and source-scoped. Deleted, empty and non-file messages are ignored. fileciteturn697file0
+The indexer validates the configured entity with `client.get_entity(source.chat_id)`, then calls `client.iter_messages(source.chat_id, ...)`. This is intentionally source-scoped. Incremental mode uses the source cursor as `min_id`; full mode is explicit and source-scoped. Deleted, empty and non-file messages are ignored.
 
-`TelegramSource` stores `account_id`, `chat_id`, `chat_type`, title, sync mode, enabled state and a per-source message cursor. fileciteturn698file0
+## 3. Current domain contract
 
-## 3. Required scanner contract
+A source is structurally identified by:
+
+```text
+(account_id, chat_id)
+```
+
+A resource is structurally identified by:
+
+```text
+(source_id, telegram_chat_id, telegram_message_id)
+```
+
+`telegram_chat_id` is persisted on the Resource deliberately. It is not redundant metadata: it makes the Telegram ownership of a resource auditable and prevents a legacy record from being silently reinterpreted as belonging to a newly rebound source.
+
+`TelegramSource.bound_chat_id` records the chat identity to which the source row was previously bound. If an administrator changes `chat_id`, the scanner invalidates resources from the old binding and resets the incremental cursor before scanning the new chat.
+
+## 4. Required scanner contract
 
 ### Input
 
@@ -26,6 +42,7 @@ The indexer validates the configured entity with `client.get_entity(source.chat_
 TelegramSource
   account_id
   chat_id
+  bound_chat_id
   chat_type
   enabled
   sync_mode
@@ -38,9 +55,9 @@ For every valid file message:
 
 ```text
 Resource
-  source identity
-  Telegram chat identity
-  Telegram message identity
+  source_id
+  telegram_chat_id = source.chat_id
+  telegram_message_id
   file metadata
   recognition metadata
   category
@@ -61,39 +78,21 @@ into:
 all dialogs visible to account
 ```
 
-That was one of the most important lessons from the previous E2E failures.
+## 5. Channel vs supergroup
 
-## 4. Channel vs supergroup
+Telegram can expose channels and supergroups through entities with identical human-readable titles.
 
-Telegram can expose both channels and supergroups through Telethon entities that may have human-readable titles that are identical.
-
-Example conceptual case:
-
-```text
-Documents
-  channel
-  chat_id = X
-
-My Documents
-  supergroup
-  chat_id = Y
-```
-
-Even if two sources have the same title, they are different sources.
-
-For a supergroup, the Telegram ID is commonly represented by a negative `-100...` peer ID. A channel can also have a `-100...` peer ID in Telethon, so **the `-100` prefix alone must never be used to infer channel/group identity**. The entity type and stable peer identity are the authoritative information.
+The entity type and stable peer identity are authoritative. The `-100...` prefix alone must never be used to infer channel/group identity because channels can also use `-100...` peer IDs in Telethon.
 
 Therefore:
 
 ```text
 (title)              -> display metadata
-(chat_id + account)  -> source identity
+(account_id, chat_id)-> source identity
 (entity type)        -> chat type metadata
 ```
 
-## 5. Incremental scanning
-
-Default mode should be incremental.
+## 6. Incremental scanning
 
 ```text
 cursor = last_scanned_message_id
@@ -110,13 +109,11 @@ iter_messages(source.chat_id, min_id=cursor)
        cursor = highest observed ID
 ```
 
-The cursor belongs to the source, not to an account globally.
+The cursor belongs to the source, never to the account globally.
 
-Never share a cursor between two chats.
+## 7. Full reconciliation
 
-## 6. Full reconciliation
-
-Full mode is an explicit administrative operation.
+Full mode is an explicit administrative operation for one configured source:
 
 ```text
 configured source
@@ -129,88 +126,37 @@ read complete history of THAT source
       +--> previously indexed but absent -> unavailable
 ```
 
-A full scan must never mean "scan everything this Telegram account can see".
+It must never mean "scan everything this Telegram account can see".
 
-## 7. Resource validity
+## 8. Legacy data safety
 
-A Telegram message should be indexed as an active resource only when it has the properties required by the application, including a usable file/media payload and known size.
+Rows created before `telegram_chat_id` was persisted do not contain enough trustworthy information to reconstruct their Telegram ownership. Migration must therefore mark them `unavailable` rather than guessing their chat from the current `TelegramSource` row.
 
-Messages that are:
+A subsequent source-scoped scan creates new resources with the exact chat identity.
 
-- deleted;
-- service-only;
-- media-less;
-- file-less;
-- missing usable size;
+This rule is specifically intended to prevent the historical failure where files from a same-title Channel appeared under a Supergroup source.
 
-must not enter the normal active search set.
+## 9. Resource validity
 
-## 8. Identity and uniqueness
+Only live file messages with usable media/file metadata and known size enter the active resource set.
 
-The fundamental identity is source-bound:
+Deleted, service-only, media-less, file-less or invalid-size messages must not become active resources.
 
-```text
-(account_id, chat_id, telegram_message_id)
-```
+## 10. Cross-chat deduplication policy
 
-or, if `source_id` is itself guaranteed to represent exactly one `(account_id, chat_id)` binding:
+Do not deduplicate across chats because filenames, titles, sizes, MIME types or message IDs match.
 
-```text
-(source_id, telegram_message_id)
-```
-
-The implementation must not use filename/title as a uniqueness key.
-
-Two different chats can legitimately contain the same filename and message ID.
-
-## 9. Cross-chat deduplication policy
-
-Do **not** deduplicate across chats merely because:
-
-- filenames are equal;
-- titles are equal;
-- sizes are equal;
-- MIME types are equal;
-- message IDs happen to match.
-
-Cross-chat content deduplication may become an optional future optimization based on a content hash, but it must never change source ownership or make a resource appear to belong to another chat.
-
-## 10. Deleted/unavailable behavior
-
-Scanner reconciliation should distinguish:
-
-```text
-resource exists in DB
-        |
-        +--> Telegram message still valid -> active
-        |
-        +--> Telegram message inaccessible/deleted -> unavailable
-```
-
-Normal search should filter on `status == active`, as the baseline search service already does. fileciteturn708file0
-
-An unavailable resource may remain in the database for history/reconciliation, but should not be downloadable as if it were active.
+Content-hash deduplication may be added later as an optimization, but it must never change resource ownership or source visibility.
 
 ## 11. Account isolation
 
 Each Scanner operation must obtain the Telegram client associated with the source's `account_id`.
 
-The database-backed provider selects the enabled account, connects its session through the Telegram runtime, verifies authorization and registers the client in the process-local pool. fileciteturn703file0
-
-A future multi-account implementation must preserve:
-
-```text
-Source A -> Account A client
-Source B -> Account B client
-```
-
-and must never silently fall back to an unrelated account when a source has an explicit account binding.
+The client provider/runtime is responsible for session lifecycle and authorization. Scanner must not silently switch to an unrelated account.
 
 ## 12. Proxy boundary
 
 Scanner must not know whether Telegram connectivity uses direct networking or a proxy.
-
-Preferred dependency direction:
 
 ```text
 Scanner
@@ -218,78 +164,57 @@ Scanner
    v
 Telegram client abstraction
    |
-   +--> direct transport
-   |
+   +--> direct
    +--> SOCKS5
    +--> SOCKS4
    +--> HTTP
    +--> future transports
 ```
 
-Proxy configuration should be hot-swappable at the transport/client layer.
+Proxy is optional infrastructure and must remain hot-swappable.
 
-## 13. Scanner evolution roadmap
+## 13. Evolution roadmap
 
 ### Phase 1 — Domain contract
 
-Before changing Scanner again:
+- explicit `(account_id, chat_id)` source identity;
+- persistent `telegram_chat_id` on Resource;
+- source-bound resource uniqueness;
+- explicit source rebinding behavior;
+- active/unavailable lifecycle;
+- account binding.
 
-- make Telegram source identity explicit;
-- make Resource Telegram chat identity persistent;
-- make resource identity source-bound;
-- define active/unavailable lifecycle;
-- preserve account binding.
+### Phase 2 — Deterministic Scanner
 
-### Phase 2 — Deterministic scanner
-
-Implement and test:
-
-- incremental source scan;
+- incremental scans;
 - explicit full reconciliation;
-- deleted message handling;
-- cursor advancement;
 - idempotent rescans;
+- deletion handling;
+- cursor correctness;
 - channel/supergroup isolation;
 - same-title source isolation.
 
-### Phase 3 — Real Telegram E2E matrix
+### Phase 3 — Real Telegram E2E
 
-At minimum test:
+Test at minimum:
 
 ```text
 Account A
   |
   +--> Channel X
-  |      +--> file message
   |
   +--> Supergroup Y
-         +--> file message
 ```
 
-Also test:
-
-- same display title across different chats;
-- same filename in different chats;
-- same message ID across different chats;
-- repeated scanner cycles;
-- deleted/unavailable message;
-- cursor restart;
-- proxy enabled;
-- proxy disabled.
+with same-title, same-filename and same-message-ID cases, repeated cycles, deletion/unavailability and both proxy/direct transport.
 
 ### Phase 4 — Performance
 
-Only after correctness is stable:
-
-- batch tuning;
-- concurrency where safe;
-- retry/backoff;
-- rate-limit handling;
-- efficient entity resolution.
+Only after identity correctness is stable: batching, safe concurrency, retry/backoff, rate-limit handling and efficient entity resolution.
 
 ### Phase 5 — Download acceleration
 
-Scanner remains unchanged while Download evolves independently:
+Keep download optimization outside Scanner:
 
 ```text
 Resource
@@ -301,24 +226,20 @@ Download Scheduler
   +--> concurrent range reads
   +--> retry
   +--> cache
-  +--> account/client selection
 ```
-
-This separation directly supports the requirement to mitigate Telegram download speed limitations without making Scanner a large subsystem.
 
 ## 14. Regression checklist
 
-Before every Scanner refactor, verify:
-
 - [ ] no arbitrary dialog enumeration;
-- [ ] source chat is the only scanned chat;
-- [ ] source identity does not depend on title;
+- [ ] only `source.chat_id` is scanned;
 - [ ] account binding is preserved;
 - [ ] cursor is source-scoped;
 - [ ] rescanning is idempotent;
-- [ ] old resources do not migrate between chats;
+- [ ] resource stores exact Telegram chat ID;
+- [ ] source rebinding invalidates old resources;
 - [ ] same filename across chats remains separate;
-- [ ] deleted messages are not active;
+- [ ] same message ID across chats remains separate;
+- [ ] legacy chat-less resources are not guessed into a source;
 - [ ] unavailable resources are hidden from normal search;
 - [ ] proxy choice does not alter scanner semantics;
-- [ ] scanner does not perform file downloads.
+- [ ] scanner does not download complete files.
