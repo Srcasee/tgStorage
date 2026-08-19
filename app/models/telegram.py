@@ -1,19 +1,9 @@
-"""Telegram account and source ORM models."""
+"""Telegram source ORM model."""
 
 from sqlalchemy import BigInteger, Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
-
-
-class TelegramAccount(Base):
-    __tablename__ = "telegram_accounts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    session_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    status: Mapped[str] = mapped_column(String(32), default="unknown")
 
 
 class TelegramSource(Base):
