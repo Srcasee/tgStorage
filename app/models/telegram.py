@@ -16,3 +16,6 @@ class TelegramSource(Base):
     title: Mapped[str] = mapped_column(String(256), default="")
     sync_mode: Mapped[str] = mapped_column(String(32), default="incremental")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Incremental cursor scoped to this exact source identity.
+    last_scanned_message_id: Mapped[int] = mapped_column(BigInteger, default=0)
