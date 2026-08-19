@@ -1,12 +1,6 @@
-"""Telegram -> Resource indexer with explicit source boundaries.
+"""Telegram -> Resource indexer with explicit source boundaries."""
 
-The indexer intentionally does *not* enumerate Telegram dialogs. A source is
-scanned only when an administrator has created/enabled its TelegramSource row.
-This prevents a logged-in account's historical dialog cache from becoming an
-implicit discovery scope.
-"""
-
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.metadata.analyzer import ResourceAnalyzer
@@ -16,8 +10,19 @@ from app.models.resource import Resource
 from app.models.telegram import TelegramSource
 
 
+def is_indexable_message(message) -> bool:
+    """Return True only for a live Telegram file message."""
+    if not message or not getattr(message, "id", None):
+        return False
+    if getattr(message, "deleted", False):
+        return False
+    if not getattr(message, "media", None) or not getattr(message, "file", None):
+        return False
+    return getattr(message.file, "size", None) is not None
+
+
 class TelegramResourceIndexer:
-    """Index currently valid file messages from one explicitly configured source."""
+    """Index file messages from exactly one configured TelegramSource."""
 
     def __init__(self, session: AsyncSession, analyzer=None, classifier=None) -> None:
         self.session = session
@@ -26,21 +31,27 @@ class TelegramResourceIndexer:
         self.categories = CategoryResolver(session)
 
     async def index_source(self, client, source: TelegramSource, limit: int = 200) -> int:
-        """Index one configured source.
+        chat_id = int(source.chat_id)
+        if source.bound_chat_id is None:
+            source.bound_chat_id = chat_id
+        elif int(source.bound_chat_id) != chat_id:
+            await self.session.execute(
+                Resource.__table__.update()
+                .where(Resource.source_id == source.id)
+                .values(status="unavailable")
+            )
+            source.bound_chat_id = chat_id
+            source.last_scanned_message_id = 0
 
-        ``incremental`` mode reads only messages newer than the source cursor.
-        ``full`` mode is an explicit reconciliation and reads the complete
-        history of this configured source. No other dialogs are inspected.
-        """
-        # Validate that the configured chat is still accessible. This is an
-        # entity lookup, not dialog enumeration, and therefore cannot expand
-        # the scan scope beyond this source.
-        await client.get_entity(source.chat_id)
+        await client.get_entity(chat_id)
 
         result = await self.session.execute(
-            select(Resource).where(Resource.source_id == source.id)
+            select(Resource).where(
+                Resource.source_id == source.id,
+                Resource.telegram_chat_id == chat_id,
+            )
         )
-        existing = {resource.telegram_message_id: resource for resource in result.scalars()}
+        existing = {r.telegram_message_id: r for r in result.scalars()}
 
         full_reconcile = source.sync_mode == "full"
         cursor = source.last_scanned_message_id or 0
@@ -48,33 +59,18 @@ class TelegramResourceIndexer:
         indexed = 0
         max_message_id = cursor
 
-        message_kwargs = {}
-        if full_reconcile:
-            # Full mode is deliberately explicit and source-scoped. It is the
-            # only mode allowed to reconcile historical resources.
-            message_kwargs["limit"] = None
-        else:
-            message_kwargs["min_id"] = cursor
-            message_kwargs["limit"] = limit
+        kwargs = {"limit": None if full_reconcile else limit}
+        if not full_reconcile:
+            kwargs["min_id"] = cursor
 
-        async for message in client.iter_messages(source.chat_id, **message_kwargs):
-            if not message or not getattr(message, "id", None):
+        async for message in client.iter_messages(chat_id, **kwargs):
+            if not is_indexable_message(message):
                 continue
-
             message_id = int(message.id)
             max_message_id = max(max_message_id, message_id)
-
-            # Telegram may return service/empty messages in history. They are
-            # not resources and must not move the resource into the active set.
-            if getattr(message, "deleted", False):
-                continue
-            if not message.media or not message.file:
-                continue
-            if message.file.size is None:
-                continue
-
             seen_ids.add(message_id)
             resource = existing.get(message_id)
+
             filename = message.file.name or f"{message_id}.bin"
             mime_type = message.file.mime_type or ""
             metadata = self.analyzer.analyze(filename, mime_type)
@@ -83,21 +79,11 @@ class TelegramResourceIndexer:
             )
             category_id = await self.categories.resolve(category_name)
 
-            if resource is not None:
-                # A resource previously marked unavailable may become valid
-                # again if Telegram exposes the message/media once more.
-                resource.status = "active"
-                resource.filename = filename
-                resource.extension = metadata["extension"]
-                resource.mime_type = mime_type
-                resource.resource_type = metadata["resource_type"]
-                resource.tags_json = metadata["tags"]
-                resource.size = message.file.size or 0
-                resource.category_id = category_id
-            else:
+            if resource is None:
                 self.session.add(
                     Resource(
                         source_id=source.id,
+                        telegram_chat_id=chat_id,
                         telegram_message_id=message_id,
                         filename=filename,
                         extension=metadata["extension"],
@@ -110,12 +96,17 @@ class TelegramResourceIndexer:
                     )
                 )
                 indexed += 1
+            else:
+                resource.status = "active"
+                resource.filename = filename
+                resource.extension = metadata["extension"]
+                resource.mime_type = mime_type
+                resource.resource_type = metadata["resource_type"]
+                resource.tags_json = metadata["tags"]
+                resource.size = message.file.size or 0
+                resource.category_id = category_id
 
         if full_reconcile:
-            # Because full mode enumerated the complete history of this exact
-            # source, anything previously indexed but not seen is no longer a
-            # currently valid resource. Keep it for audit/history, but hide it
-            # from normal search and download.
             for message_id, resource in existing.items():
                 if message_id is not None and message_id not in seen_ids:
                     resource.status = "unavailable"
