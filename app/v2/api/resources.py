@@ -6,13 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.v2.api.dependencies import get_db_session
 from app.v2.search.service import ResourceSearchService
 
-router = APIRouter(prefix="/api/v2/resources", tags=["resources"])
+router = APIRouter(prefix="/resources", tags=["resources"])
 
 
 async def get_search_service(
     session: AsyncSession = Depends(get_db_session),
 ) -> ResourceSearchService:
-    """Build search service with the current database session."""
     return ResourceSearchService(session)
 
 
@@ -21,7 +20,7 @@ async def search_resources(
     q: str | None = Query(default=None),
     category_id: int | None = Query(default=None),
     resource_type: str | None = Query(default=None),
-    limit: int = Query(default=50, le=200),
+    limit: int = Query(default=50, ge=1, le=200),
     service: ResourceSearchService = Depends(get_search_service),
 ):
     resources = await service.search(
@@ -39,6 +38,8 @@ async def search_resources(
             "resource_type": item.resource_type,
             "category_id": item.category_id,
             "tags": item.tags_json,
+            "size": item.size,
+            "mime_type": item.mime_type,
         }
         for item in resources
     ]
