@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import AsyncIterator, Protocol
+from typing import AsyncIterator
+
+from .providers import TelegramFileProvider
 
 
 @dataclass
@@ -10,24 +12,8 @@ class TelegramChunk:
     data: bytes
 
 
-class TelegramFileProvider(Protocol):
-    async def read_chunk(
-        self,
-        chat_id: int,
-        message_id: int,
-        offset: int,
-        limit: int,
-    ) -> bytes:
-        ...
-
-
 class TelegramChunkReader:
-    """Read Telegram resources as chunks.
-
-    This layer intentionally does not create Telegram clients. Client lifecycle,
-    account selection and proxy handling are delegated to the client pool and
-    network plugin layers.
-    """
+    """Read Telegram media through the injected storage provider."""
 
     def __init__(self, provider: TelegramFileProvider):
         self.provider = provider
@@ -39,22 +25,20 @@ class TelegramChunkReader:
         start: int = 0,
         chunk_size: int = 256 * 1024,
         total_size: int | None = None,
+        account_id: int | None = None,
     ) -> AsyncIterator[TelegramChunk]:
         offset = start
+        remaining = None if total_size is None else max(total_size - start, 0)
 
-        while True:
-            data = await self.provider.read_chunk(
-                chat_id=chat_id,
-                message_id=message_id,
-                offset=offset,
-                limit=chunk_size,
-            )
-
+        async for data in self.provider.stream_message(
+            chat_id=chat_id,
+            message_id=message_id,
+            offset=start,
+            limit=remaining,
+            chunk_size=chunk_size,
+            account_id=account_id,
+        ):
             if not data:
                 break
-
             yield TelegramChunk(offset=offset, data=data)
             offset += len(data)
-
-            if total_size is not None and offset >= total_size:
-                break
