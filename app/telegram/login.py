@@ -1,6 +1,6 @@
 import os
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 from telethon import TelegramClient
 from sqlalchemy import select
@@ -8,10 +8,6 @@ from sqlalchemy import select
 from app.core.database import SessionLocal
 from app.models.account import TelegramAccount
 
-
-# =====================================================
-# 环境变量
-# =====================================================
 
 TG_API_ID = int(os.getenv("TG_API_ID"))
 TG_API_HASH = os.getenv("TG_API_HASH")
@@ -29,10 +25,6 @@ TG_SESSION = os.getenv(
 
 TG_SESSION = os.path.abspath(TG_SESSION)
 
-
-# =====================================================
-# 代理配置
-# =====================================================
 
 ENABLE_PROXY = (
     os.getenv("ENABLE_PROXY", "false").lower() == "true"
@@ -70,11 +62,12 @@ async def register_account():
         )
 
         account = result.scalar_one_or_none()
+        now = datetime.now(timezone.utc)
 
         if account:
             account.session_path = TG_SESSION
             account.status = "online"
-            account.last_login = datetime.utcnow()
+            account.last_login = now
             print("账号已更新:", ACCOUNT_NAME, flush=True)
         else:
             account = TelegramAccount(
@@ -82,7 +75,7 @@ async def register_account():
                 session_path=TG_SESSION,
                 enabled=True,
                 status="online",
-                last_login=datetime.utcnow(),
+                last_login=now,
             )
             session.add(account)
             print("账号已注册:", ACCOUNT_NAME, flush=True)
