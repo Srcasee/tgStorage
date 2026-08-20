@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.database import get_session
+from app.core.database import get_session
 from app.models import Resource, TelegramAccount, TelegramSource
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -38,26 +38,13 @@ class ResourceCategoryUpdateRequest(BaseModel):
 async def list_accounts():
     async with get_session() as session:
         result = await session.execute(select(TelegramAccount))
-        return [
-            {
-                "id": account.id,
-                "name": account.name,
-                "status": account.status,
-                "enabled": account.enabled,
-                "last_login": account.last_login,
-            }
-            for account in result.scalars().all()
-        ]
+        return [{"id": x.id, "name": x.name, "status": x.status, "enabled": x.enabled, "last_login": x.last_login} for x in result.scalars().all()]
 
 
 @router.post("/accounts")
 async def create_account(payload: AccountCreateRequest):
     async with get_session() as session:
-        account = TelegramAccount(
-            name=payload.name,
-            session_path=payload.session_path,
-            enabled=payload.enabled,
-        )
+        account = TelegramAccount(**payload.model_dump())
         session.add(account)
         await session.commit()
         await session.refresh(account)
@@ -79,18 +66,7 @@ async def update_account(account_id: int, enabled: bool):
 async def list_sources():
     async with get_session() as session:
         result = await session.execute(select(TelegramSource))
-        return [
-            {
-                "id": source.id,
-                "account_id": source.account_id,
-                "chat_id": source.chat_id,
-                "chat_type": source.chat_type,
-                "title": source.title,
-                "enabled": source.enabled,
-                "sync_mode": source.sync_mode,
-            }
-            for source in result.scalars().all()
-        ]
+        return [{"id": x.id, "account_id": x.account_id, "chat_id": x.chat_id, "chat_type": x.chat_type, "title": x.title, "enabled": x.enabled, "sync_mode": x.sync_mode} for x in result.scalars().all()]
 
 
 @router.post("/sources")
@@ -107,18 +83,7 @@ async def create_source(payload: SourceCreateRequest):
 async def list_resources():
     async with get_session() as session:
         result = await session.execute(select(Resource))
-        return [
-            {
-                "id": resource.id,
-                "filename": resource.filename,
-                "source_id": resource.source_id,
-                "category_id": resource.category_id,
-                "mime_type": resource.mime_type,
-                "size": resource.size,
-                "status": resource.status,
-            }
-            for resource in result.scalars().all()
-        ]
+        return [{"id": x.id, "filename": x.filename, "source_id": x.source_id, "category_id": x.category_id, "mime_type": x.mime_type, "size": x.size, "status": x.status} for x in result.scalars().all()]
 
 
 @router.patch("/resources/{resource_id}")
