@@ -35,7 +35,9 @@ class TelegramResourceCleanup:
     async def remove_duplicate_resources(self) -> int:
         """Mark duplicate source/chat/message rows while retaining first resource."""
         result = await self.session.execute(
-            select(Resource).where(Resource.status == "active").order_by(Resource.source_id, Resource.telegram_chat_id, Resource.telegram_message_id, Resource.id)
+            select(Resource)
+            .where(Resource.status == "active")
+            .order_by(Resource.source_id, Resource.telegram_chat_id, Resource.telegram_message_id, Resource.id)
         )
         seen = set()
         changed = 0
@@ -46,6 +48,33 @@ class TelegramResourceCleanup:
                 changed += 1
             else:
                 seen.add(key)
+        await self.session.flush()
+        return changed
+
+    async def remove_cross_chat_message_collisions(self) -> int:
+        """Invalidate message ids reused by different Telegram chats.
+
+        Telegram message ids are scoped to a chat. Any resource collision with
+        the same account-independent message id but another chat identity is
+        historical pollution and must not remain searchable.
+        """
+        result = await self.session.execute(
+            select(Resource).where(Resource.status == "active")
+        )
+        resources = list(result.scalars())
+        changed = 0
+        seen = {}
+        for resource in resources:
+            key = resource.telegram_message_id
+            if key is None:
+                continue
+            previous = seen.get(key)
+            if previous is not None and previous.telegram_chat_id != resource.telegram_chat_id:
+                if resource.status != "unavailable":
+                    resource.status = "unavailable"
+                    changed += 1
+            else:
+                seen[key] = resource
         await self.session.flush()
         return changed
 
@@ -68,6 +97,7 @@ class TelegramResourceCleanup:
     async def reconcile(self) -> int:
         changed = await self.invalidate_out_of_boundary_resources()
         changed += await self.remove_duplicate_resources()
+        changed += await self.remove_cross_chat_message_collisions()
         changed += await self.purge_invalid_resources()
         await self.session.commit()
         return changed
