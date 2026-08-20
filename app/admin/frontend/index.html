@@ -10,13 +10,20 @@
     <h1>tgStorage Admin</h1>
 
     <section>
-      <h2>Accounts</h2>
+      <h2>Create Account</h2>
+      <input id="account-name" placeholder="name" />
+      <input id="account-session" placeholder="session_path" />
+      <button onclick="createAccount()">Create</button>
       <button onclick="loadAccounts()">Refresh</button>
       <pre id="accounts">loading...</pre>
     </section>
 
     <section>
-      <h2>Sources</h2>
+      <h2>Create Source</h2>
+      <input id="source-account" placeholder="account_id" />
+      <input id="source-chat" placeholder="chat_id" />
+      <input id="source-title" placeholder="title" />
+      <button onclick="createSource()">Create</button>
       <button onclick="loadSources()">Refresh</button>
       <pre id="sources">loading...</pre>
     </section>
