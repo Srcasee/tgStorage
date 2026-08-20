@@ -1,24 +1,18 @@
 async function loadJson(endpoint, target) {
   const response = await fetch(endpoint);
-  if (!response.ok) {
-    throw new Error(`${endpoint}: ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`${endpoint}: ${response.status}`);
   const data = await response.json();
   document.getElementById(target).textContent = JSON.stringify(data, null, 2);
 }
 
-async function sendJson(endpoint, method, body) {
+async function sendJson(endpoint, method, body = null) {
   const response = await fetch(endpoint, {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   });
-
-  if (!response.ok) {
-    throw new Error(`${endpoint}: ${response.status}`);
-  }
-
-  return response.json();
+  if (!response.ok) throw new Error(`${endpoint}: ${response.status}`);
+  return response.status === 204 ? null : response.json();
 }
 
 function showError(error) {
@@ -26,17 +20,9 @@ function showError(error) {
   alert(error.message);
 }
 
-async function loadAccounts() {
-  return loadJson('/api/v2/admin/accounts', 'accounts');
-}
-
-async function loadSources() {
-  return loadJson('/api/v2/admin/sources', 'sources');
-}
-
-async function loadResources() {
-  return loadJson('/api/v2/admin/resources', 'resources');
-}
+async function loadAccounts() { return loadJson('/api/v2/admin/accounts', 'accounts'); }
+async function loadSources() { return loadJson('/api/v2/admin/sources', 'sources'); }
+async function loadResources() { return loadJson('/api/v2/admin/resources', 'resources'); }
 
 async function createAccount() {
   try {
@@ -44,11 +30,22 @@ async function createAccount() {
       name: document.getElementById('account-name').value,
       session_path: document.getElementById('account-session').value,
     });
-    clearAccountForm();
     await loadAccounts();
-  } catch (error) {
-    showError(error);
-  }
+  } catch (error) { showError(error); }
+}
+
+async function updateAccount(id, enabled) {
+  try {
+    await sendJson(`/api/v2/admin/accounts/${id}`, 'PATCH', { enabled });
+    await loadAccounts();
+  } catch (error) { showError(error); }
+}
+
+async function deleteAccount(id) {
+  try {
+    await sendJson(`/api/v2/admin/accounts/${id}`, 'DELETE');
+    await loadAccounts();
+  } catch (error) { showError(error); }
 }
 
 async function createSource() {
@@ -58,22 +55,22 @@ async function createSource() {
       chat_id: Number(document.getElementById('source-chat').value),
       title: document.getElementById('source-title').value,
     });
-    clearSourceForm();
     await loadSources();
-  } catch (error) {
-    showError(error);
-  }
+  } catch (error) { showError(error); }
 }
 
-function clearAccountForm() {
-  document.getElementById('account-name').value = '';
-  document.getElementById('account-session').value = '';
+async function updateSource(id, enabled) {
+  try {
+    await sendJson(`/api/v2/admin/sources/${id}`, 'PATCH', { enabled });
+    await loadSources();
+  } catch (error) { showError(error); }
 }
 
-function clearSourceForm() {
-  document.getElementById('source-account').value = '';
-  document.getElementById('source-chat').value = '';
-  document.getElementById('source-title').value = '';
+async function deleteSource(id) {
+  try {
+    await sendJson(`/api/v2/admin/sources/${id}`, 'DELETE');
+    await loadSources();
+  } catch (error) { showError(error); }
 }
 
 loadAccounts().catch(console.error);
