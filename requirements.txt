@@ -6,3 +6,4 @@ httpx
 sqlalchemy
 aiosqlite
 alembic
+python-dotenv
