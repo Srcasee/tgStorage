@@ -1,6 +1,6 @@
 """Telegram -> Resource indexer with explicit source boundaries."""
 
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.metadata.analyzer import ResourceAnalyzer
@@ -8,18 +8,13 @@ from app.metadata.category_resolver import CategoryResolver
 from app.metadata.classifier import ResourceClassifier
 from app.models.resource import Resource
 from app.models.telegram import TelegramSource
-from app.telegram.cleanup import TelegramResourceCleanup
 from app.telegram.identity import normalize_chat_id
 
 
 def is_indexable_message(message) -> bool:
-    if not message or not getattr(message, "id", None):
+    if not message or getattr(message, "deleted", False):
         return False
-    if getattr(message, "deleted", False):
-        return False
-    if not getattr(message, "media", None) or not getattr(message, "file", None):
-        return False
-    return getattr(message.file, "size", None) is not None
+    return bool(getattr(message, "media", None) and getattr(message, "file", None))
 
 
 def validate_telegram_entity(source: TelegramSource, entity) -> None:
@@ -62,9 +57,11 @@ class TelegramResourceIndexer:
         chat_id = normalize_chat_id(int(source.chat_id))
 
         if source.bound_chat_id is not None and int(source.bound_chat_id) != chat_id:
-            await self.session.execute(
-                delete(Resource).where(Resource.source_id == source.id)
+            result = await self.session.execute(
+                select(Resource).where(Resource.source_id == source.id)
             )
+            for resource in result.scalars():
+                resource.status = "unavailable"
             source.last_scanned_message_id = 0
 
         source.bound_chat_id = chat_id
@@ -72,31 +69,31 @@ class TelegramResourceIndexer:
         entity = await client.get_entity(chat_id)
         validate_telegram_entity(source, entity)
 
-        await TelegramResourceCleanup(self.session).reconcile()
-
         result = await self.session.execute(
-            select(Resource).where(
-                Resource.source_id == source.id,
-                Resource.telegram_chat_id == chat_id,
-            )
+            select(Resource).where(Resource.source_id == source.id)
         )
         existing = {r.telegram_message_id: r for r in result.scalars()}
 
         cursor = source.last_scanned_message_id or 0
         created = 0
         max_id = cursor
+        seen = set()
 
-        if source.sync_mode == "full":
-            iterator = client.iter_messages(chat_id, limit=None)
-        else:
-            iterator = client.iter_messages(chat_id, limit=limit, min_id=cursor)
+        kwargs = {"limit": None} if source.sync_mode == "full" else {
+            "limit": limit,
+            "min_id": cursor,
+        }
 
-        async for message in iterator:
+        async for message in client.iter_messages(chat_id, **kwargs):
             if not is_indexable_message(message):
                 continue
 
             message_id = int(message.id)
+            if source.sync_mode != "full" and message_id <= cursor:
+                continue
+
             max_id = max(max_id, message_id)
+            seen.add(message_id)
 
             if message_id in existing:
                 continue
@@ -126,6 +123,11 @@ class TelegramResourceIndexer:
                 status="active",
             ))
             created += 1
+
+        if source.sync_mode == "full":
+            for message_id, resource in existing.items():
+                if message_id not in seen:
+                    resource.status = "unavailable"
 
         source.last_scanned_message_id = max_id
         await self.session.commit()
