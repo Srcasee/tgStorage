@@ -21,6 +21,11 @@ async function sendJson(endpoint, method, body) {
   return response.json();
 }
 
+function showError(error) {
+  console.error(error);
+  alert(error.message);
+}
+
 async function loadAccounts() {
   return loadJson('/api/v2/admin/accounts', 'accounts');
 }
@@ -34,20 +39,30 @@ async function loadResources() {
 }
 
 async function createAccount() {
-  await sendJson('/api/v2/admin/accounts', 'POST', {
-    name: document.getElementById('account-name').value,
-    session_path: document.getElementById('account-session').value,
-  });
-  await loadAccounts();
+  try {
+    await sendJson('/api/v2/admin/accounts', 'POST', {
+      name: document.getElementById('account-name').value,
+      session_path: document.getElementById('account-session').value,
+    });
+    clearAccountForm();
+    await loadAccounts();
+  } catch (error) {
+    showError(error);
+  }
 }
 
 async function createSource() {
-  await sendJson('/api/v2/admin/sources', 'POST', {
-    account_id: Number(document.getElementById('source-account').value),
-    chat_id: Number(document.getElementById('source-chat').value),
-    title: document.getElementById('source-title').value,
-  });
-  await loadSources();
+  try {
+    await sendJson('/api/v2/admin/sources', 'POST', {
+      account_id: Number(document.getElementById('source-account').value),
+      chat_id: Number(document.getElementById('source-chat').value),
+      title: document.getElementById('source-title').value,
+    });
+    clearSourceForm();
+    await loadSources();
+  } catch (error) {
+    showError(error);
+  }
 }
 
 function clearAccountForm() {
