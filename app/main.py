@@ -6,7 +6,9 @@ from fastapi.responses import FileResponse
 
 from app.api.router import router as api_router
 from app.core.config import settings
+from app.core.database import engine
 from app.indexer.worker import TelegramIndexWorker
+from app.models import Base
 from app.telegram.lifecycle import create_runtime_lifecycle
 
 app = FastAPI()
@@ -33,6 +35,9 @@ async def web():
 
 @app.on_event("startup")
 async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     await runtime_lifecycle.startup()
     if index_worker_enabled:
         index_worker.start()
