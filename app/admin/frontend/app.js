@@ -50,6 +50,17 @@ async function createSource() {
   await loadSources();
 }
 
+function clearAccountForm() {
+  document.getElementById('account-name').value = '';
+  document.getElementById('account-session').value = '';
+}
+
+function clearSourceForm() {
+  document.getElementById('source-account').value = '';
+  document.getElementById('source-chat').value = '';
+  document.getElementById('source-title').value = '';
+}
+
 loadAccounts().catch(console.error);
 loadSources().catch(console.error);
 loadResources().catch(console.error);
