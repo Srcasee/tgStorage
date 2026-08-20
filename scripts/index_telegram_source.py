@@ -21,7 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from sqlalchemy import select
 
-from app.core.database import async_session_factory
+from app.core.database import SessionLocal
 from app.models.account import TelegramAccount
 from app.models.telegram import TelegramSource
 from app.telegram.runtime_registry import get_provider
@@ -32,7 +32,7 @@ async def main() -> None:
     account_id = int(os.environ["ACCOUNT_ID"])
     source_id = int(os.environ["SOURCE_ID"])
 
-    async with async_session_factory() as session:
+    async with SessionLocal() as session:
         account = (
             await session.execute(
                 select(TelegramAccount).where(TelegramAccount.id == account_id)
