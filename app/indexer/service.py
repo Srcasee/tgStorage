@@ -1,6 +1,6 @@
 """Telegram -> Resource indexer with explicit source boundaries."""
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.metadata.analyzer import ResourceAnalyzer
@@ -41,10 +41,6 @@ def refresh_resource_metadata(
     size,
     category_id,
 ):
-    """Update an existing resource metadata snapshot.
-
-    Kept as a compatibility API for metadata refresh workflows and tests.
-    """
     resource.filename = filename
     resource.extension = extension
     resource.mime_type = mime_type
@@ -64,6 +60,15 @@ class TelegramResourceIndexer:
 
     async def index_source(self, client, source: TelegramSource, limit: int = 200) -> int:
         chat_id = normalize_chat_id(int(source.chat_id))
+
+        if source.bound_chat_id is not None and int(source.bound_chat_id) != chat_id:
+            await self.session.execute(
+                delete(Resource).where(Resource.source_id == source.id)
+            )
+            source.last_scanned_message_id = 0
+
+        source.bound_chat_id = chat_id
+
         entity = await client.get_entity(chat_id)
         validate_telegram_entity(source, entity)
 
@@ -81,7 +86,12 @@ class TelegramResourceIndexer:
         created = 0
         max_id = cursor
 
-        async for message in client.iter_messages(chat_id, limit=limit, min_id=cursor):
+        if source.sync_mode == "full":
+            iterator = client.iter_messages(chat_id, limit=None)
+        else:
+            iterator = client.iter_messages(chat_id, limit=limit, min_id=cursor)
+
+        async for message in iterator:
             if not is_indexable_message(message):
                 continue
 
