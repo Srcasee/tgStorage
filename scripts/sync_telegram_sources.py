@@ -13,6 +13,17 @@ from app.models.account import TelegramAccount
 from app.models.telegram import TelegramSource
 
 
+def build_proxy():
+    if os.getenv("ENABLE_PROXY", "false").lower() != "true":
+        return None
+    return {
+        "proxy_type": os.getenv("PROXY_TYPE", "socks5"),
+        "addr": os.getenv("PROXY_HOST", "proxy"),
+        "port": int(os.getenv("PROXY_PORT", "1080")),
+        "rdns": True,
+    }
+
+
 async def sync_sources(account_name: str) -> None:
     async with SessionLocal() as session:
         result = await session.execute(
@@ -26,6 +37,7 @@ async def sync_sources(account_name: str) -> None:
             account.session_path,
             int(os.environ["TG_API_ID"]),
             os.environ["TG_API_HASH"],
+            proxy=build_proxy(),
         )
 
         await client.start()
@@ -37,7 +49,6 @@ async def sync_sources(account_name: str) -> None:
                 continue
 
             chat_id = dialog.id
-
             existing = await session.execute(
                 select(TelegramSource).where(
                     TelegramSource.account_id == account.id,
@@ -47,23 +58,20 @@ async def sync_sources(account_name: str) -> None:
             source = existing.scalar_one_or_none()
 
             if source is None:
-                source = TelegramSource(
+                session.add(TelegramSource(
                     account_id=account.id,
                     chat_id=chat_id,
                     title=dialog.name or "",
                     chat_type="channel" if getattr(entity, "broadcast", False) else "group",
                     bound_chat_id=chat_id,
                     enabled=True,
-                )
-                session.add(source)
+                ))
             else:
                 source.title = dialog.name or source.title
-
             count += 1
 
         await session.commit()
         await client.disconnect()
-
         print(f"Registered Telegram sources: {count}")
 
 
