@@ -23,6 +23,11 @@ TG_SESSION = os.getenv(
     "/data/accounts/default"
 )
 
+# Session paths are stored in the container-mounted namespace so they remain
+# valid after container recreation and across new deployments.
+if TG_SESSION.startswith("./data/"):
+    TG_SESSION = TG_SESSION.replace("./data", "/data", 1)
+
 TG_SESSION = os.path.abspath(TG_SESSION)
 
 
