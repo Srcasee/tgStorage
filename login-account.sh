@@ -15,6 +15,7 @@ echo "[LOGIN] phone   : ${PHONE}"
 
 docker compose run --rm \
   -e TG_PHONE="${PHONE}" \
+  -e TG_ACCOUNT_NAME="${ACCOUNT_NAME}" \
   -e TG_SESSION="${SESSION_PATH}" \
   telegram-drive \
   python3 -m app.telegram.login
