@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -24,7 +25,7 @@ class Message:
 
 class Client:
     async def get_entity(self, chat_id):
-        return object()
+        return SimpleNamespace(id=chat_id)
 
     async def iter_messages(self, chat_id, **kwargs):
         yield Message()
