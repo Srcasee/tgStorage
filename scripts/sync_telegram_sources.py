@@ -8,13 +8,13 @@ import sys
 from telethon import TelegramClient
 from sqlalchemy import select
 
-from app.database import get_session
+from app.core.database import SessionLocal
 from app.models.account import TelegramAccount
 from app.models.telegram import TelegramSource
 
 
 async def sync_sources(account_name: str) -> None:
-    async with get_session() as session:
+    async with SessionLocal() as session:
         result = await session.execute(
             select(TelegramAccount).where(TelegramAccount.name == account_name)
         )
