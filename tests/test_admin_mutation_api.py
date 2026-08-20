@@ -2,6 +2,7 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 from app.main import app
 from app.core.database import get_session
@@ -81,5 +82,12 @@ async def test_admin_resource_category_mutation_relation_e2e(override_database, 
             )
             assert response.status_code == 200
             assert response.json()["category_id"] == category_id
+
+        async with test_session_factory() as session:
+            result = await session.execute(
+                select(Resource).where(Resource.id == resource_id)
+            )
+            updated_resource = result.scalar_one()
+            assert updated_resource.category_id == category_id
     finally:
         app.dependency_overrides.clear()
