@@ -17,7 +17,7 @@ async def test_admin_account_and_source_mutation_e2e(override_database):
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             account = await client.post(
                 "/admin/accounts",
-                json={"name": "test-account", "enabled": True},
+                json={"name": "test-account", "session_path": "/tmp/test.session", "enabled": True},
             )
             assert account.status_code == 200
             account_id = account.json()["id"]
@@ -44,6 +44,7 @@ async def test_admin_resource_category_mutation_relation_e2e(override_database, 
         async with test_session_factory() as session:
             account = TelegramAccount(
                 name="resource-test-account",
+                session_path="/tmp/resource-test.session",
                 enabled=True,
             )
             session.add(account)
