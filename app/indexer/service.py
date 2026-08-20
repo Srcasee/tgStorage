@@ -32,6 +32,7 @@ class TelegramResourceIndexer:
 
     async def index_source(self, client, source: TelegramSource, limit: int = 200) -> int:
         chat_id = int(source.chat_id)
+
         if source.bound_chat_id is None:
             source.bound_chat_id = chat_id
         elif int(source.bound_chat_id) != chat_id:
@@ -43,7 +44,15 @@ class TelegramResourceIndexer:
             source.bound_chat_id = chat_id
             source.last_scanned_message_id = 0
 
-        await client.get_entity(chat_id)
+        # Hard source boundary:
+        # never discover a source by title/dialog enumeration. The configured
+        # chat_id is the only identity. Validate the resolved entity so a
+        # same-name channel/group cannot leak into this source.
+        entity = await client.get_entity(chat_id)
+        if int(getattr(entity, "id", chat_id)) != chat_id:
+            raise RuntimeError(
+                f"telegram source binding mismatch: expected {chat_id}, got {getattr(entity, 'id', None)}"
+            )
 
         result = await self.session.execute(
             select(Resource).where(
@@ -66,9 +75,6 @@ class TelegramResourceIndexer:
         async for message in client.iter_messages(chat_id, **kwargs):
             message_id = int(message.id) if getattr(message, "id", None) else 0
 
-            # Telethon normally enforces min_id, but the scanner must keep its
-            # own boundary guarantee to protect against retries, mocked clients,
-            # cached results, and future client implementations.
             if not full_reconcile and message_id <= cursor:
                 continue
 
