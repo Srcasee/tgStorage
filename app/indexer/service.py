@@ -22,6 +22,32 @@ def is_indexable_message(message) -> bool:
     return getattr(message.file, "size", None) is not None
 
 
+def validate_telegram_entity(source: TelegramSource, entity) -> None:
+    """Strictly validate Telegram source identity.
+
+    Telegram titles are not unique. A channel and a supergroup can share the
+    same title, therefore scanning decisions must only depend on entity id and
+    Telegram entity flags.
+    """
+    entity_id = int(getattr(entity, "id", 0))
+    if entity_id != int(source.chat_id):
+        raise RuntimeError(
+            f"telegram source binding mismatch: expected {source.chat_id}, got {entity_id}"
+        )
+
+    if source.chat_type == "group":
+        if not bool(getattr(entity, "megagroup", False)):
+            raise RuntimeError("telegram source is not a megagroup")
+        if bool(getattr(entity, "broadcast", False)):
+            raise RuntimeError("telegram group cannot be broadcast channel")
+
+    elif source.chat_type == "channel":
+        if not bool(getattr(entity, "broadcast", False)):
+            raise RuntimeError("telegram source is not a broadcast channel")
+        if bool(getattr(entity, "megagroup", False)):
+            raise RuntimeError("telegram channel cannot be megagroup")
+
+
 class TelegramResourceIndexer:
     """Index file messages from exactly one configured TelegramSource."""
 
@@ -46,16 +72,7 @@ class TelegramResourceIndexer:
             source.last_scanned_message_id = 0
 
         entity = await client.get_entity(chat_id)
-        if int(getattr(entity, "id", chat_id)) != chat_id:
-            raise RuntimeError(
-                f"telegram source binding mismatch: expected {chat_id}, got {getattr(entity, 'id', None)}"
-            )
-
-        if hasattr(entity, "megagroup"):
-            if source.chat_type == "group" and not bool(entity.megagroup):
-                raise RuntimeError("telegram source is not a megagroup")
-            if source.chat_type == "channel" and not bool(getattr(entity, "broadcast", False)):
-                raise RuntimeError("telegram source is not a broadcast channel")
+        validate_telegram_entity(source, entity)
 
         await TelegramResourceCleanup(self.session).reconcile()
 
