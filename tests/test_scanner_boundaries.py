@@ -32,7 +32,11 @@ class FakeClient:
 
     async def get_entity(self, chat_id):
         self.entity_ids.append(chat_id)
-        return SimpleNamespace(id=chat_id, broadcast=True, megagroup=True)
+        if chat_id == -1001:
+            return SimpleNamespace(id=chat_id, broadcast=True, megagroup=False)
+        if chat_id == -1002:
+            return SimpleNamespace(id=chat_id, broadcast=False, megagroup=True)
+        return SimpleNamespace(id=chat_id)
 
     async def iter_messages(self, chat_id, **kwargs):
         self.iter_kwargs = (chat_id, kwargs)
