@@ -8,6 +8,7 @@ from app.metadata.category_resolver import CategoryResolver
 from app.metadata.classifier import ResourceClassifier
 from app.models.resource import Resource
 from app.models.telegram import TelegramSource
+from app.telegram.cleanup import TelegramResourceCleanup
 
 
 def is_indexable_message(message) -> bool:
@@ -44,15 +45,19 @@ class TelegramResourceIndexer:
             source.bound_chat_id = chat_id
             source.last_scanned_message_id = 0
 
-        # Hard source boundary:
-        # never discover a source by title/dialog enumeration. The configured
-        # chat_id is the only identity. Validate the resolved entity so a
-        # same-name channel/group cannot leak into this source.
         entity = await client.get_entity(chat_id)
         if int(getattr(entity, "id", chat_id)) != chat_id:
             raise RuntimeError(
                 f"telegram source binding mismatch: expected {chat_id}, got {getattr(entity, 'id', None)}"
             )
+
+        if hasattr(entity, "megagroup"):
+            if source.chat_type == "group" and not bool(entity.megagroup):
+                raise RuntimeError("telegram source is not a megagroup")
+            if source.chat_type == "channel" and not bool(getattr(entity, "broadcast", False)):
+                raise RuntimeError("telegram source is not a broadcast channel")
+
+        await TelegramResourceCleanup(self.session).reconcile()
 
         result = await self.session.execute(
             select(Resource).where(
@@ -77,7 +82,6 @@ class TelegramResourceIndexer:
 
             if not full_reconcile and message_id <= cursor:
                 continue
-
             if not is_indexable_message(message):
                 continue
 
@@ -88,41 +92,30 @@ class TelegramResourceIndexer:
             filename = message.file.name or f"{message_id}.bin"
             mime_type = message.file.mime_type or ""
             metadata = self.analyzer.analyze(filename, mime_type)
-            category_name = self.classifier.classify(
-                filename, metadata["resource_type"], metadata["tags"]
-            )
+            category_name = self.classifier.classify(filename, metadata["resource_type"], metadata["tags"])
             category_id = await self.categories.resolve(category_name)
 
             if resource is None:
-                self.session.add(
-                    Resource(
-                        source_id=source.id,
-                        telegram_chat_id=chat_id,
-                        telegram_message_id=message_id,
-                        filename=filename,
-                        extension=metadata["extension"],
-                        mime_type=mime_type,
-                        resource_type=metadata["resource_type"],
-                        tags_json=metadata["tags"],
-                        size=message.file.size or 0,
-                        category_id=category_id,
-                        status="active",
-                    )
-                )
+                self.session.add(Resource(
+                    source_id=source.id,
+                    telegram_chat_id=chat_id,
+                    telegram_message_id=message_id,
+                    filename=filename,
+                    extension=metadata["extension"],
+                    mime_type=mime_type,
+                    resource_type=metadata["resource_type"],
+                    tags_json=metadata["tags"],
+                    size=message.file.size or 0,
+                    category_id=category_id,
+                    status="active",
+                ))
                 indexed += 1
             else:
                 resource.status = "active"
-                resource.filename = filename
-                resource.extension = metadata["extension"]
-                resource.mime_type = mime_type
-                resource.resource_type = metadata["resource_type"]
-                resource.tags_json = metadata["tags"]
-                resource.size = message.file.size or 0
-                resource.category_id = category_id
 
         if full_reconcile:
             for message_id, resource in existing.items():
-                if message_id is not None and message_id not in seen_ids:
+                if message_id not in seen_ids:
                     resource.status = "unavailable"
 
         source.last_scanned_message_id = max_message_id
