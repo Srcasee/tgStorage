@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.core.database import get_session
-from app.models import Resource, Category
+from app.models import Resource, Category, TelegramAccount, TelegramSource
 
 
 @pytest.mark.asyncio
@@ -37,19 +37,39 @@ async def test_admin_account_and_source_mutation_e2e(override_database):
 
 
 @pytest.mark.asyncio
-async def test_admin_resource_category_mutation_e2e(override_database, test_session_factory):
+async def test_admin_resource_category_mutation_relation_e2e(override_database, test_session_factory):
     app.dependency_overrides[get_session] = override_database
     try:
         async with test_session_factory() as session:
+            account = TelegramAccount(
+                name="resource-test-account",
+                enabled=True,
+            )
+            session.add(account)
+            await session.commit()
+            await session.refresh(account)
+
+            source = TelegramSource(
+                account_id=account.id,
+                chat_id=-100999999,
+                chat_type="channel",
+                title="resource-test-source",
+            )
             category = Category(name="test-category")
+            session.add_all([source, category])
+            await session.commit()
+            await session.refresh(source)
+            await session.refresh(category)
+
             resource = Resource(
+                source_id=source.id,
                 filename="test.mkv",
                 category_id=None,
             )
-            session.add_all([category, resource])
+            session.add(resource)
             await session.commit()
-            await session.refresh(category)
             await session.refresh(resource)
+
             resource_id = resource.id
             category_id = category.id
 
