@@ -16,14 +16,14 @@ async def test_admin_account_and_source_mutation_e2e(override_database):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             account = await client.post(
-                "/admin/accounts",
+                "/api/v2/admin/accounts",
                 json={"name": "test-account", "session_path": "/tmp/test.session", "enabled": True},
             )
             assert account.status_code == 200
             account_id = account.json()["id"]
 
             source = await client.post(
-                "/admin/sources",
+                "/api/v2/admin/sources",
                 json={
                     "account_id": account_id,
                     "chat_id": -100123456,
@@ -78,7 +78,7 @@ async def test_admin_resource_category_mutation_relation_e2e(override_database, 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.patch(
-                f"/admin/resources/{resource_id}",
+                f"/api/v2/admin/resources/{resource_id}",
                 json={"category_id": category_id},
             )
             assert response.status_code == 200
