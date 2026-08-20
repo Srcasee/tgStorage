@@ -30,6 +30,31 @@ def validate_telegram_entity(source: TelegramSource, entity) -> None:
         )
 
 
+def refresh_resource_metadata(
+    resource,
+    *,
+    filename,
+    extension,
+    mime_type,
+    resource_type,
+    tags,
+    size,
+    category_id,
+):
+    """Update an existing resource metadata snapshot.
+
+    Kept as a compatibility API for metadata refresh workflows and tests.
+    """
+    resource.filename = filename
+    resource.extension = extension
+    resource.mime_type = mime_type
+    resource.resource_type = resource_type
+    resource.tags_json = tags
+    resource.size = size
+    resource.category_id = category_id
+    resource.status = "active"
+
+
 class TelegramResourceIndexer:
     def __init__(self, session: AsyncSession, analyzer=None, classifier=None):
         self.session = session
