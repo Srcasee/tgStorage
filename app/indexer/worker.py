@@ -1,5 +1,6 @@
 """Small background worker for the Telegram resource indexer."""
 
+import argparse
 import asyncio
 
 from sqlalchemy import select
@@ -69,10 +70,39 @@ class TelegramIndexWorker:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    # One broken account/source must not prevent other sources
-                    # from being indexed during the same cycle.
                     await session.rollback()
                     print(
                         f"[INDEX] source={source.id} failed: {exc!r}",
                         flush=True,
                     )
+
+
+async def scan_source(account_id: int | None = None, limit: int = 200) -> int:
+    """Run one explicit incremental scan cycle for configured sources."""
+    total = 0
+    async with SessionLocal() as session:
+        query = select(TelegramSource).where(TelegramSource.enabled.is_(True))
+        if account_id is not None:
+            from app.models.telegram import TelegramSource as TS
+            from app.models.account import TelegramAccount
+            query = query.join(TelegramAccount).where(TelegramAccount.id == account_id)
+        result = await session.execute(query)
+        sources = list(result.scalars().all())
+        runtime = get_runtime()
+        pool = get_pool()
+        for source in sources:
+            provider = DatabaseTelegramClientProvider(session, runtime, pool)
+            client = await provider.get_client(source.account_id)
+            count = await TelegramResourceIndexer(session).index_source(client, source, limit)
+            total += count
+            print(f"[SCAN] source={source.id} resources_created={count}", flush=True)
+    print(f"[SCAN] completed resources_created={total}", flush=True)
+    return total
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--account-id", type=int)
+    parser.add_argument("--limit", type=int, default=200)
+    args = parser.parse_args()
+    asyncio.run(scan_source(args.account_id, args.limit))
