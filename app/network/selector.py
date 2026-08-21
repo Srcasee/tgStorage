@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.v2.network.plugin import DirectNetworkPlugin, NetworkPlugin
+from app.network.plugin import DirectNetworkPlugin, NetworkPlugin
 
 
 class NetworkSelector:
