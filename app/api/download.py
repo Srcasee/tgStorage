@@ -4,14 +4,15 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db_session
-from app.download.cache_provider import get_download_message_cache
 from app.download.resource_resolver import ResourceResolver
-from app.download.telethon_provider import TelethonFileProvider
+from app.download.telegram_file_provider import RuntimeTelegramFileProvider
 from app.download.telegram import TelegramStreamBackend
 from app.download.telegram_reader import TelegramChunkReader
+from app.models.account import TelegramAccount
 from app.telegram.client_provider import (
     DatabaseTelegramClientProvider,
     TelegramClientAuthorizationError,
@@ -53,7 +54,6 @@ def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
 
 
 def _content_disposition(filename: str, resource_id: int) -> str:
-    """Build a safe attachment header with ASCII and UTF-8 filenames."""
     name = filename.strip() or str(resource_id)
     fallback = "".join(
         ch if 32 <= ord(ch) < 127 and ch not in '\\"' else "_"
@@ -63,18 +63,26 @@ def _content_disposition(filename: str, resource_id: int) -> str:
     return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
-async def _get_backend(session: AsyncSession, account_id: int | None) -> tuple[TelegramStreamBackend, TelethonFileProvider]:
+async def _load_telegram_account(session: AsyncSession, account_id: int) -> TelegramAccount:
+    result = await session.execute(
+        select(TelegramAccount).where(TelegramAccount.id == account_id)
+    )
+    account = result.scalar_one_or_none()
+    if account is None:
+        raise RuntimeError(f"telegram account {account_id} does not exist")
+    return account
+
+
+async def _get_backend(session: AsyncSession, account_id: int | None) -> tuple[TelegramStreamBackend, RuntimeTelegramFileProvider]:
     client_provider = DatabaseTelegramClientProvider(
         session=session,
         runtime=get_runtime(),
         pool=get_pool(),
     )
-    # Authenticate before returning StreamingResponse. Errors raised only
-    # while iterating the response body cannot change its HTTP status safely.
     await client_provider.get_client(account_id)
-    provider = TelethonFileProvider(
+    provider = RuntimeTelegramFileProvider(
         client_provider,
-        message_cache=get_download_message_cache(),
+        lambda selected_id: _load_telegram_account(session, selected_id),
     )
     reader = TelegramChunkReader(provider)
     return TelegramStreamBackend(ResourceResolver(session), reader), provider
@@ -87,7 +95,6 @@ async def download_resource(
     session: AsyncSession = Depends(get_db_session),
 ):
     resolver = ResourceResolver(session)
-
     try:
         location = await resolver.resolve_telegram(resource_id)
     except LookupError as exc:
