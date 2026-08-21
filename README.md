@@ -1,12 +1,12 @@
 # tgStorage
 
+## 项目定位
+
+tgStorage 是基于 Telegram 作为存储后端的资源管理系统。
+
 ## 当前架构检查记录
 
-Telegram Runtime、Network Plugin 与 Download 抽象层已完成阶段性整合。
-
-当前目标：补齐 Telegram File Provider Adapter，将 Telegram Client 生命周期与下载流连接。
-
-当前设计：
+当前 Telegram 下载与运行时架构：
 
 ```
 Telegram Runtime
@@ -25,18 +25,19 @@ Chunk Reader
 已完成：
 
 - Telegram Client Runtime 生命周期管理
-- Network Plugin Runtime 注入
+- Network Plugin Runtime 接入
 - 多账号 Client 管理基础能力
 - Download Provider 抽象
-- Chunk Range 下载接口
+- Chunk Range 下载接口设计
+- Docker / Alembic / CI 工程修复
 
-进行中：
+当前开发阶段：
 
 - Telegram File Provider Adapter
 - 下载调度优化
-- Chunk 并发下载
+- Chunk 并发下载能力
 
-未来扩展路线保持：
+扩展路线：
 
 ```
 单机多账号
@@ -46,4 +47,12 @@ Chunk Reader
 分布式下载调度
 ```
 
-当前架构不会改变 Resource API 和 Download 抽象。
+未来扩展无需改变 Resource API 和 Download 抽象。
+
+## 开发原则
+
+- 保留 FastAPI
+- 保留 Telegram Connector
+- 保持模块解耦
+- 优先修复工程债务
+- 再增加核心能力
