@@ -6,7 +6,7 @@ tgStorage 是基于 Telegram 作为存储后端的资源管理系统。
 
 ## Telegram 下载架构
 
-当前运行路径：
+当前稳定运行路径：
 
 ```
 Telegram Runtime
@@ -22,6 +22,8 @@ TelegramStreamBackend
 Download API
 ```
 
+## 当前稳定阶段
+
 已完成：
 
 - Telegram Client Runtime 生命周期管理
@@ -30,7 +32,12 @@ Download API
 - Telegram File Provider 抽象
 - Runtime Telegram File Provider 接入
 - Chunk Range 下载接口设计
-- Docker / Alembic / CI 工程修复
+- Chunk Scheduler 基础能力
+- Telegram Chunk Worker Adapter
+- Ordered Chunk Merger
+- Concurrent Chunk Stream 抽象
+- Download Strategy Selector
+- Download Engine 抽象
 
 ## Legacy 路径清理
 
@@ -48,6 +55,17 @@ TelegramFileProvider Protocol
 ```
 
 保持上层下载逻辑与 Telegram 实现解耦。
+
+## 当前回滚状态
+
+并发下载 API 最终接线阶段已暂停，代码恢复至稳定架构节点：
+
+```
+23066fe
+feat: assemble download runtime factories
+```
+
+保留已完成的抽象层设计，不启用未完成的 API 路由切换。
 
 ## 分布式下载扩展路线
 
