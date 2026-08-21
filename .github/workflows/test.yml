@@ -40,10 +40,16 @@ jobs:
       - name: Validate Alembic configuration
         run: |
           alembic current
-          alembic heads
+          HEAD_COUNT=$(alembic heads | grep -c "head")
+          if [ "$HEAD_COUNT" -ne 1 ]; then
+            echo "Multiple Alembic heads detected"
+            alembic heads
+            exit 1
+          fi
 
       - name: Test database migration
         run: |
+          rm -f test.db
           alembic upgrade head
 
       - name: Compile Python files
