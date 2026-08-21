@@ -1,52 +1,42 @@
 """Lightweight Telethon client lifecycle for tgStorage."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from telethon import TelegramClient
 
 from app.models.account import TelegramAccount
-from app.core.config import ProxySettings
+from app.network.selector import NetworkSelector
 
 
 @dataclass(frozen=True)
 class TelegramClientConfig:
     api_id: int
     api_hash: str
-    proxy: ProxySettings = ProxySettings()
-
-    def telethon_proxy(self):
-        if not self.proxy.enabled:
-            return None
-        if not self.proxy.host or not self.proxy.port:
-            return None
-
-        return (
-            self.proxy.proxy_type or "socks5",
-            self.proxy.host,
-            self.proxy.port,
-        )
 
 
 class TelegramClientRuntime:
-    def __init__(self, config: TelegramClientConfig):
+    def __init__(self, config: TelegramClientConfig, network_selector: NetworkSelector | None = None):
         self.config = config
+        self.network_selector = network_selector or NetworkSelector()
         self._clients: dict[int, TelegramClient] = {}
 
-    def get_or_create(self, account: TelegramAccount) -> TelegramClient:
+    def get_or_create(self, account: TelegramAccount, network_type: str | None = None) -> TelegramClient:
         client = self._clients.get(account.id)
         if client is None:
+            plugin = self.network_selector.select(network_type)
             client = TelegramClient(
                 account.session_path,
                 self.config.api_id,
                 self.config.api_hash,
-                proxy=self.config.telethon_proxy(),
+                **(plugin.client_options() if plugin else {}),
             )
             self._clients[account.id] = client
         return client
 
-    async def connect(self, account: TelegramAccount) -> TelegramClient:
-        client = self.get_or_create(account)
+    async def connect(self, account: TelegramAccount, network_type: str | None = None) -> TelegramClient:
+        client = self.get_or_create(account, network_type)
         if not client.is_connected():
             await client.connect()
         return client
