@@ -50,12 +50,14 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tgstorage.db")
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
+    admin_api_key: str | None = None
     proxy: ProxySettings = ProxySettings()
 
     def __post_init__(self) -> None:
         api_id = _env_first("TG_API_ID", "TELEGRAM_API_ID")
         object.__setattr__(self, "telegram_api_id", int(api_id) if api_id else None)
         object.__setattr__(self, "telegram_api_hash", _env_first("TG_API_HASH", "TELEGRAM_API_HASH"))
+        object.__setattr__(self, "admin_api_key", _env_first("ADMIN_API_KEY"))
 
         proxy = ProxySettings(
             enabled=_env_bool("ENABLE_PROXY"),
