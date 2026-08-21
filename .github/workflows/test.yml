@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: .
+  DATABASE_URL: sqlite+aiosqlite:///./test.db
+
 jobs:
   run:
     runs-on: ubuntu-latest
