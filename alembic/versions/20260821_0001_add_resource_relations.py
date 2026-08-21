@@ -6,7 +6,6 @@ Create Date: 2026-08-21
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "20260821_0001"
 down_revision = None
@@ -15,26 +14,26 @@ depends_on = None
 
 
 def upgrade():
-    # These constraints formalize the existing SQLAlchemy model relationships.
-    # Deployment databases should run this after validating existing IDs.
-    op.create_foreign_key(
-        "fk_resources_source_id",
-        "resources",
-        "telegram_sources",
-        ["source_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-    op.create_foreign_key(
-        "fk_resources_category_id",
-        "resources",
-        "categories",
-        ["category_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    # SQLite does not support ALTER TABLE ADD CONSTRAINT directly.
+    # Use batch mode so this migration works on SQLite and production databases.
+    with op.batch_alter_table("resources") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_resources_source_id",
+            "telegram_sources",
+            ["source_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
+        batch_op.create_foreign_key(
+            "fk_resources_category_id",
+            "categories",
+            ["category_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade():
-    op.drop_constraint("fk_resources_category_id", "resources", type_="foreignkey")
-    op.drop_constraint("fk_resources_source_id", "resources", type_="foreignkey")
+    with op.batch_alter_table("resources") as batch_op:
+        batch_op.drop_constraint("fk_resources_category_id", type_="foreignkey")
+        batch_op.drop_constraint("fk_resources_source_id", type_="foreignkey")
