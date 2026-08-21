@@ -1,24 +1,30 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from .download_engine import DownloadEngine
+from .strategy import DownloadStrategySelector
 
 
 class DownloadRuntime:
-    """Runtime assembly layer for download execution.
+    """Factory and execution boundary for download flows.
 
-    Keeps API routes away from concrete stream construction.
+    Keeps API routes independent from concrete stream implementations.
     """
 
-    def __init__(self, engine: DownloadEngine) -> None:
+    def __init__(
+        self,
+        engine: DownloadEngine,
+        selector: DownloadStrategySelector | None = None,
+    ) -> None:
         self.engine = engine
+        self.selector = selector or DownloadStrategySelector()
 
     async def stream(
         self,
         file_size: int,
-        stream_factory,
-        concurrent_factory,
+        stream_factory: Callable[[], AsyncIterator[bytes]],
+        concurrent_factory: Callable[[], AsyncIterator[bytes]],
     ) -> AsyncIterator[bytes]:
         async for chunk in self.engine.stream(
             file_size,
@@ -26,3 +32,16 @@ class DownloadRuntime:
             concurrent_factory,
         ):
             yield chunk
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        stream_factory: Callable[[], AsyncIterator[bytes]],
+        concurrent_factory: Callable[[], AsyncIterator[bytes]],
+        selector: DownloadStrategySelector | None = None,
+    ) -> "DownloadRuntime":
+        return cls(
+            engine=DownloadEngine(selector=selector),
+            selector=selector,
+        )
