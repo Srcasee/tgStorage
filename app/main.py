@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -6,13 +7,8 @@ from fastapi.responses import FileResponse
 
 from app.api.router import router as api_router
 from app.core.config import settings
-from app.core.database import engine
 from app.indexer.worker import TelegramIndexWorker
-from app.models import Base
 from app.telegram.lifecycle import create_runtime_lifecycle
-
-app = FastAPI()
-app.include_router(api_router)
 
 runtime_lifecycle = create_runtime_lifecycle()
 index_worker = TelegramIndexWorker(
@@ -23,22 +19,10 @@ index_worker_enabled = settings.telegram_api_id is not None and bool(settings.te
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 
-@app.get("/")
-async def home():
-    return FileResponse(WEB_INDEX)
-
-
-@app.get("/web")
-async def web():
-    return FileResponse(WEB_INDEX)
-
-
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     await runtime_lifecycle.startup()
+
     if index_worker_enabled:
         index_worker.start()
     else:
@@ -47,9 +31,23 @@ async def startup():
             flush=True,
         )
 
+    try:
+        yield
+    finally:
+        if index_worker_enabled:
+            await index_worker.stop()
+        await runtime_lifecycle.shutdown()
 
-@app.on_event("shutdown")
-async def shutdown():
-    if index_worker_enabled:
-        await index_worker.stop()
-    await runtime_lifecycle.shutdown()
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(api_router)
+
+
+@app.get("/")
+async def home():
+    return FileResponse(WEB_INDEX)
+
+
+@app.get("/web")
+async def web():
+    return FileResponse(WEB_INDEX)
