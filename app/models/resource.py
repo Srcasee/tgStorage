@@ -1,7 +1,7 @@
 """Resource metadata ORM model for tgStorage v2."""
 
-from sqlalchemy import BigInteger, Index, Integer, JSON, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -20,29 +20,29 @@ class Resource(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("telegram_sources.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
-    # Telegram message identity is explicitly chat-bound. Message IDs are
-    # not globally meaningful across channels/groups.
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     telegram_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     filename: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     extension: Mapped[str] = mapped_column(String(32), default="")
     mime_type: Mapped[str] = mapped_column(String(128), default="")
-
-    # Lightweight analyzer metadata.
-    # Avoid separate tag tables to keep deployment simple.
-    resource_type: Mapped[str] = mapped_column(
-        String(32),
-        default="unknown",
-    )
-    tags_json: Mapped[list[str] | None] = mapped_column(
-        JSON,
-        nullable=True,
-    )
+    resource_type: Mapped[str] = mapped_column(String(32), default="unknown")
+    tags_json: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     size: Mapped[int] = mapped_column(BigInteger, default=0)
     hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     status: Mapped[str] = mapped_column(String(32), default="active")
+
+    source = relationship("TelegramSource", back_populates="resources")
+    category = relationship("Category", back_populates="resources")
