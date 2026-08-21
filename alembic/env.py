@@ -3,8 +3,9 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
+from app.core.config import settings
 from app.models import Base
 
 config = context.config
@@ -14,8 +15,19 @@ if config.config_file_name:
 target_metadata = Base.metadata
 
 
+def _migration_url() -> str:
+    """Return a synchronous SQLAlchemy URL for Alembic.
+
+    Application runtime uses async drivers (for example aiosqlite). Alembic
+    migrations use SQLAlchemy's synchronous migration engine, so convert the
+    known async driver names here.
+    """
+    url = settings.database_url
+    return url.replace("+aiosqlite", "").replace("+asyncpg", "")
+
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = _migration_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -28,9 +40,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        _migration_url(),
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
