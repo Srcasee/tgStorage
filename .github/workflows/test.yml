@@ -2,11 +2,38 @@ name: test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Hello
-        run: echo "Workflow started"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate application import
+        run: |
+          python -c "from app.main import app; print(app.title)"
+
+      - name: Validate Alembic configuration
+        run: |
+          alembic current
+          alembic heads
+
+      - name: Compile Python files
+        run: |
+          python -m compileall app
