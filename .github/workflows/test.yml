@@ -3,10 +3,14 @@ name: Tests
 on:
   push:
     branches:
+      - develop
+      - main
       - architecture-consolidation
       - 'fix/**'
   pull_request:
     branches:
+      - develop
+      - main
       - architecture-consolidation
   workflow_dispatch:
 
@@ -25,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: |
             requirements.txt
