@@ -43,6 +43,15 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(api_router)
 
 
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "indexer_enabled": index_worker_enabled,
+    }
+
+
 @app.get("/")
 async def home():
     return FileResponse(WEB_INDEX)
