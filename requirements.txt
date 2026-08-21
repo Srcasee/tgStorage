@@ -1,5 +1,9 @@
-fastapi  
+fastapi
 uvicorn
 telethon
 python-socks[asyncio]
 httpx
+sqlalchemy
+aiosqlite
+alembic
+python-dotenv

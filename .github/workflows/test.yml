@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - architecture-consolidation
+      - 'fix/**'
+      - optimize/**
+  pull_request:
+    branches:
+      - develop
+      - main
+      - architecture-consolidation
+      - optimize/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run ruff
+        run: ruff check .
+
+      - name: Run mypy
+        run: mypy app
+
+      - name: Run test suite
+        run: python -m pytest -q --cov=app --cov-report=term-missing
