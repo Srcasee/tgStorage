@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db_session
+from app.download.cache_provider import get_download_message_cache
 from app.download.resource_resolver import ResourceResolver
 from app.download.telethon_provider import TelethonFileProvider
 from app.download.telegram import TelegramStreamBackend
@@ -71,7 +72,10 @@ async def _get_backend(session: AsyncSession, account_id: int | None) -> tuple[T
     # Authenticate before returning StreamingResponse. Errors raised only
     # while iterating the response body cannot change its HTTP status safely.
     await client_provider.get_client(account_id)
-    provider = TelethonFileProvider(client_provider)
+    provider = TelethonFileProvider(
+        client_provider,
+        message_cache=get_download_message_cache(),
+    )
     reader = TelegramChunkReader(provider)
     return TelegramStreamBackend(ResourceResolver(session), reader), provider
 
