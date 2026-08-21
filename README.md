@@ -515,3 +515,104 @@ Frontend
 ✅ VideoStream思想
 ✅ Chunk Cache思想
 
+
+# tgStorage v1.0 Architecture Audit
+
+## Current status
+
+tgStorage 已完成 Telegram Storage Gateway 核心能力：
+
+- Telegram Connector
+- Resource Indexer
+- FastAPI Storage API
+- Range Streaming Download
+- Admin API
+- Basic Search
+
+当前版本处于架构收敛阶段。
+
+
+## Known Technical Debt
+
+### P0
+
+1. Database consolidation
+
+Current:
+
+sqlite3 legacy layer
++
+SQLAlchemy/Alembic
+
+
+Target:
+
+SQLAlchemy ORM
++
+Alembic migration
+
+
+2. Persistent Download Engine
+
+Add:
+
+download_tasks
+
+download_chunks
+
+
+Support:
+
+- resume
+- retry
+- crash recovery
+
+
+### P1
+
+3. Authentication upgrade
+
+Replace:
+
+single admin API key
+
+
+With:
+
+User
+Role
+Permission
+Token
+
+
+4. Search engine upgrade
+
+Replace:
+
+LIKE query
+
+
+With:
+
+FTS5/PostgreSQL FTS
+
+
+## v1.0 Roadmap
+
+Phase 0
+Database consolidation
+
+Phase 1
+Resource management
+
+Phase 2
+Admin system
+
+Phase 3
+Download scheduler
+
+Phase 4
+Search optimization
+
+Phase 5
+Multi-user deployment
