@@ -1,307 +1,787 @@
-# Telegram Drive v1.0
+我对这个系统的要求是
+1、TG存储源→API→系统识别→web前端→用户搜索、下载是核心功能(视频播放图片预览等属于可扩展)
+2、管理员→web后台→控制资源按账号显示、分类，支持多账号
+3 、proxy始终是可选的插件要成为热插拔项，而且支持多种网络类型
+4、尽可能绕过TG下载速度的限制
+5、系统不要臃肿，最终的实际部署操作要简单
 
-## 项目简介
+根据你提出的目标，tgStorage 的定位需要从目前的：
 
-Telegram Drive 是一个基于 Telegram 作为对象存储后端的个人云盘系统。
+Telegram 文件读取网关 + 视频流服务
 
-通过 Telethon 连接 Telegram，多账号扫描 Telegram 文件消息，建立 SQLite
-文件索引，并通过 FastAPI 提供下载与视频在线播放能力。
+升级为：
+Telegram 作为对象存储后端的多账号资源管理系统（Storage Gateway）
+核心不再是视频播放，而是：
+Telegram Storage Layer
+        ↓
+Indexer / Metadata Layer
+        ↓
+Storage API Layer
+        ↓
+Web Admin + User Frontend
+        ↓
+Search / Download / Preview
 
-------------------------------------------------------------------------
+下面按优先级制定升级路线。
 
-## 当前版本
+一、目标架构调整
+当前架构
+目前：
+Telegram
+   |
+Telethon
+   |
+Scanner
+   |
+SQLite
+   |
+FastAPI
+   |
+简单Web
 
-版本：
+问题：
+TG资源和用户没有分层
+管理能力不足
+Proxy耦合
+下载优化不足
+没有权限模型
+升级后架构
+建议：
+                    ┌──────────────┐
+                    │ Web Admin    │
+                    └──────┬───────┘
+                           │
+                    Resource Manager
+                           │
+                           ▼
+Telegram Accounts
+        |
+        |
+┌───────┴────────┐
+│ TG Connector   │
+│ Plugin System  │
+└───────┬────────┘
+        |
+        ▼
+ Telegram Storage Layer
+        |
+        ▼
+ Metadata Engine
+        |
+        |
+ ┌──────┴────────┐
+ │ Search Index  │
+ │ PostgreSQL    │
+ └───────────────┘
+        |
+        ▼
+ API Gateway
+        |
+        ▼
+ Web Frontend
 
-`v1.0`
+二、开发阶段规划
+分：
+Phase 0 修复基础问题
+Phase 1 核心资源系统
+Phase 2 管理后台
+Phase 3 网络插件系统
+Phase 4 下载性能优化
+Phase 5 云盘化
+Phase 0：基础修复（必须）
 
-最终稳定提交：
+目标：
+让现有系统成为可靠基础。
 
-`629e7fa sync database schema with current production structure`
+周期：
+约 1~2 周
 
-Release：
+0.1 数据模型重构（最高优先）
+当前：
+accounts
+files
+telegram_sources
+关系不完整。
 
-`v1.0`
+改：
+accounts
 
-------------------------------------------------------------------------
+TG账号
 
-## 核心功能
+accounts
 
-### Telegram 多账号
+id
+name
+phone
+session_path
+enabled
+status
+last_login
+telegram_sources
+
+TG资源来源：
+telegram_sources
+
+id
+account_id
+
+chat_id
+chat_type
+
+name
+
+sync_mode
+
+enabled
+
+关系：
+Account
+ |
+ +-- Channel A
+ |
+ +-- Channel B
+files
+
+资源文件：
+files
+id
+source_id
+telegram_message_id
+filename
+mime
+size
+hash
+category_id
+created_time
+status
+categories
+
+新增：
+categories
+id
+name
+parent_id
+icon
 
 支持：
+影视
+ ├── 动画
+ ├── 电影
 
--   多 Telegram Session
--   多账号同时在线
--   文件绑定账号
--   自动选择账号下载
+资料
+ ├── PDF
+ └── 软件
 
-当前账号：
+Phase 1：资源管理核心
 
--   larsniel
--   DGWosh
--   Asada
+对应你的第1、2点。
 
-### 文件扫描
+目标：
+TG存储源 → API → 系统识别 → Web
 
-支持：
-
--   Channel / Group 扫描
--   增量同步
--   定时扫描
--   文件索引
-
-### 文件下载
-
-接口：
-
-`GET /files/{id}/download`
-
-支持：
-
--   大文件下载
--   HTTP Range
--   分段读取
-
-### 视频流
-
-接口：
-
-`GET /files/{id}/stream`
-
-支持：
-
--   Range 请求
--   浏览器在线播放
--   视频 seek
-
-------------------------------------------------------------------------
-
-## 数据库
+1.1 增加资源识别引擎
+新增：
+Resource Analyzer
+扫描文件：
+自动判断：
+文件类型
+.mp4
+.mkv
+.jpg
+.png
+.pdf
+.zip
+.apk
+.exe
+分类规则
+例如：
+文件：
+[BDMV]鬼灭之刃S01E01.mkv
+自动：
+视频
+ |
+ 动画
+规则系统
 
 数据库：
+category_rules
+pattern
+category_id
+priority
+例如：
+*.mkv
+→ 视频
+*.pdf
+→ 文档
 
-`/data/files.db`
-
-主要表：
-
--   files
--   accounts
--   telegram_sources
--   categories
--   shares
-
-唯一索引：
-
-`(account_id, telegram_chat_id, message_id)`
-
-用于避免重复索引。
-
-------------------------------------------------------------------------
-
-## v1.0 验收记录
-
-### 下载测试
-
-26MB+ 文件下载成功。
-
-### Range 测试
-
-结果：
-
-`206 Partial Content`
+1.2 搜索系统升级
+当前：
+LIKE
+升级：
+PostgreSQL + FTS
 
 支持：
-
--   bytes=0-1023
--   随机偏移读取
-
-### 视频流测试
-
-结果：
-
-`206 Partial Content`
-
-浏览器播放和分段读取正常。
-
-------------------------------------------------------------------------
-
-# v1.0 已知问题
-
-## 1. Telethon 偶发连接关闭日志
-
-日志：
-
-    Server closed the connection:
-    0 bytes read on a total of 8 expected bytes
-
-原因：
-
-Telegram MTProto 长连接网络行为。
-
-影响：
-
-无。
-
-验证：
-
--   Scanner 正常运行
--   Client 未退出
--   下载正常
--   视频正常
-
-后续版本可优化日志处理。
-
-------------------------------------------------------------------------
-
-## 2. Stream 接口暂不支持 HEAD
-
-现象：
-
-    HEAD /files/{id}/stream
-
+关键词、文件名、标签、分类、来源
+搜索：
+鬼灭
 返回：
+动画
+电影
+BD
+1080P
 
-    405 Method Not Allowed
+1.3 API重新设计
+当前：
+/files
+改：
+REST：
+/api/resources
 
-影响：
+GET
+资源列表
 
-低。
+GET
+资源搜索
 
-不影响：
+GET
+资源详情
 
--   浏览器播放
--   Range 请求
+GET
+download
 
-计划：
+Phase 2：管理员后台
+对应你的第2点。
+目标：
+管理员：
+Web Admin
+管理：
 
-v1.1 增加 HEAD。
+2.1 TG账号管理
+页面：
+Telegram Accounts
+账号A
+状态:
+在线
+资源:
+12000
+流量:
+500GB
 
-------------------------------------------------------------------------
+操作：启用、禁用、删除
+测试连接
 
-## 3. HTTP Header 可继续优化
+2.2 来源管理
+页面：
+Channels
+账号A
+ ├── Movie Channel
+ ├── Anime Channel
+
+账号B
+ └── Backup Channel
+
+操作：
+添加频道
+设置同步模式
+设置分类
+
+2.3 文件管理
+显示：
+资源
+文件名
+来源账号
+来源频道
+分类
+大小
+时间
+
+支持：
+修改分类
+批量移动
+删除索引
+
+Phase 3：Proxy插件系统
+对应你的第3点。
+现在：
+proxy写死配置。
+需要改成：
+Proxy Provider架构
+Network Layer
+       Proxy Manager
+              |
+      +-------+-------+
+ SOCKS5
+ HTTP
+ MTProto Proxy
+ Direct
+ WireGuard
+ VPN
+
+3.1 Proxy接口
+定义：
+class ProxyProvider:
+    connect()
+    test()
+    get_proxy()
+    health_check()
+
+3.2 插件目录
+plugins/
+proxy/
+    socks5.py
+    http.py
+    mtproto.py
+    wireguard.py
+
+3.3 热插拔
+数据库：
+network_plugins
+id
+type
+config
+enabled
+priority
+运行：
+修改后台配置
+↓
+reload
+↓
+无需重启TG服务
+
+Phase 4：绕过TG下载限制（重点）
+对应你的第4点。
+先说明：
+Telegram下载速度限制无法真正“绕过”。
+但是可以：
+最大化利用多账号、多连接、缓存。
+
+4.1 多账号下载池
+现在：
+file
+ |
+account
+升级：
+Downloader Pool
+Account A
+  |
+ 10MB/s
+
+Account B
+  |
+ 10MB/s
+
+Account C
+  |
+ 10MB/s
+       ↓
+ Merge Stream
+
+4.2 Chunk并发下载
+当前：
+单文件：
+chunk1
+chunk2
+chunk3
+升级：
+          file
+chunk1 ─ account A
+chunk2 ─ account B
+chunk3 ─ account C
+merge
+
+4.3 热点缓存
+增加：
+Hot Cache
+访问次数
+最近访问
+播放位置
+例如：
+热门视频：
+自动缓存：
+0-500MB
+
+4.4 下载调度器
+新增：
+Download Scheduler
+负责：
+选择：
+哪个TG账号下载最快
+指标：
+speed
+error rate
+flood wait
+latency
+
+Phase 5：用户系统
+后续。
+增加：
+Users
+Roles
+Permissions
+权限：
+管理员
+普通用户
+游客
+
+三、推荐技术升级
+数据库
+当前：
+SQLite
+升级：
+PostgreSQL
+原因：
+需要：用户、权限、分类、搜索、统计、缓存
+
+增加：
+Redis
+用途：文件热点、Session、下载任务、后端
+保留：
+FastAPI
+很好。
+
+前端
+建议：
+替换：
+index.html
+为：
+Vue3 + TypeScript
+
+结构：
+frontend
+admin
+user
+
+四、最终版本目标
+完成后：
+                Admin
+                 |
+                 |
+Telegram Accounts
+        |
+        |
+ Proxy Plugin Layer
+        |
+        |
+ TG Storage Engine
+        |
+        |
+ Metadata/Search Engine
+        |
+        |
+ API Gateway
+        |
+        |
+ --------------------
+ |                  |
+User Web        Mobile/API
+
+搜索
+下载
+预览
+播放
+
+五、开发优先级排序
+按你的需求：
+优先级	任务	重要性
+P0	数据库重构	★★★★★
+P0	资源索引系统	★★★★★
+P0	管理员后台	★★★★★
+P1	搜索系统	★★★★★
+P1	Proxy插件化	★★★★
+P1	多账号下载调度	★★★★★
+P2	缓存优化	★★★★
+P2	视频图片预览	★★★
+P3	用户权限系统	★★★
+
+六、我建议的最终版本路线
+不要继续在现有代码上堆功能。
+建议：
+tgStorage v1
+        |
+        |
+tgStorage v2
+
+重新定义：
+Core
+Plugin
+API
+Admin
+Frontend
+
+其中：
+保留：
+✅ Telethon Connector
+✅ Scanner思想
+✅ VideoStream思想
+✅ Chunk Cache思想
+
+Phase 0-A：目录重构方案
 
 当前：
+app/
+├── files/
+├── telegram/
+├── cache/
+├── web/
+├── database.py
+├── config.py
+└── main.py
+保留兼容，但逐步迁移为：
+app/
+├── core/
+│   ├── config.py
+│   ├── database.py
+│   ├── logging.py
+│   ├── security.py
+│   └── events.py
+├── models/
+│   ├── account.py
+│   ├── resource.py
+│   ├── category.py
+│   └── network.py
+├── storage/
+│   ├── base.py
+│   ├── telegram/
+│   │   ├── client.py
+│   │   ├── session.py
+│   │   ├── scanner.py
+│   │   └── downloader.py
+│   ├── scheduler.py
+│   └── cache.py
+├── metadata/
+│   ├── analyzer.py
+│   ├── classifier.py
+│   └── rules.py
+├── api/
+│   ├── resources.py
+│   ├── download.py
+│   ├── admin.py
+│   └── auth.py
+├── plugins/
+│   │
+│   └── network/
+│       ├── base.py
+│       ├── direct.py
+│       ├── socks5.py
+│       ├── http.py
+│       └── mtproto.py
+├── admin/
+│   └── frontend/
+├── user/
+│   └── frontend/
+└── main.py
 
--   下载正常
--   Range 正常
+Phase 0-B：核心模块职责重新定义
+1. Storage Layer
+负责：
+“如何从存储取文件”
+未来不仅 Telegram。
+接口：
+class StorageBackend:
+    async def get_file_info()
+    async def stream()
+    async def download()
+    async def health()
+目前实现：
+TelegramStorageBackend
+未来可以：
+S3Backend
+LocalBackend
+WebDAVBackend
 
-后续：
+2. Telegram Layer
+只负责：
+Telegram通信。
+不负责：
+分类
+API
+用户
 
--   完善 HEAD 信息
--   增加缓存策略
--   增加 ETag
+结构：
+storage/telegram/
+client.py
+    登录
+    session
+    connection
 
-------------------------------------------------------------------------
+scanner.py
+    消息扫描
 
-## 4. 数据库初始化历史差异
+downloader.py
+    chunk读取
 
-早期开发环境数据库结构与生产结构存在差异。
+3. Metadata Layer
+新增。
+职责：
+把：
+Telegram文件
+变成：
+系统资源。
+例如：
+输入：
+Avatar.2024.1080p.mkv
+输出：
+{
+"type":"video",
+"category":"movie",
+"tags":[
+ "1080p"
+]
+}
 
-v1.0 已完成：
+Phase 0-C：数据库模型设计
+从当前：
+files.db
+升级：
+推荐：
+PostgreSQL
+但是 Phase 0 保持：
+SQLAlchemy ORM
+方便迁移。
 
--   database.py 对齐生产结构
--   保持现有 files.db 兼容
+表1：telegram_accounts
+telegram_accounts
+id
+name
+phone
+session_path
+enabled
+status
+last_login
+created_at
 
-------------------------------------------------------------------------
+表2：telegram_sources
+解决当前：
+account_id缺失问题
+telegram_sources
+id
+account_id
+chat_id
+chat_type
+title
+sync_mode
+enabled
+last_message_id
+last_sync_time
 
-##5. Video streaming
+关系：
+Account
+   |
+Sources
 
-Current status:
-- File download works normally.
-- HTTP Range requests are supported.
-- Browser video playback is unstable.
+表3：resources
+替换 files：
+resources
+id
+source_id
+telegram_message_id
+filename
+extension
+mime_type
+size
+hash
+category_id
+status
+created_at
 
-Symptoms:
-- Video player may keep loading.
-- Seek bar cannot be moved.
-- Playback may fail after buffering.
+表4：categories
+categories
+id
+name
+parent_id
+sort_order
+支持：
+视频
+ ├电影
+ ├动漫
+资料
+ ├教程
+ └文档
 
-Possible causes:
-- Telegram remote random access performance.
-- Stream layer lacks optimized caching.
-- Browser Range request handling needs improvement.
+表5：network_plugins
+为 Proxy 热插拔准备：
+network_plugins
+id
+name
+type
+config_json
+enabled
+priority
+status
 
-Planned fix:
-v1.1 StreamService redesign.
+Phase 0-D：迁移策略
+不会直接删除旧代码。
+采用：
+双结构过渡：
+旧:
+files
+新:
+resources
+迁移工具：
+新增：
+tools/
+migrate_v1_to_v2.py
+流程：
+files.db
+   |
+读取旧files
+   |
+转换
+   |
+resources表
 
-------------------------------------------------------------------------
+Phase 0-E：第一批 Commit 计划
+建议拆：
+Commit 1
+chore:
+create v2 architecture skeleton
+内容：
+新增：
+core/
+models/
+storage/
+metadata/
+plugins/
+不影响运行。
 
-## Docker
+Commit 2
+feat:
+introduce v2 database models
+新增：
+ORM模型。
 
-挂载：
+Commit 3
+feat:
+add v1 database migration tool
+迁移旧：
+files.db
 
-源码：
+Commit 4
+refactor:
+move telegram connector into storage layer
+迁移：
+app/telegram
+↓
+app/storage/telegram
+Phase 0 完成标准
+完成后：
+仓库状态：
+main
+ |
+ |
+ +-- v2-architecture-phase0
+        |
+        |
+        + core
+        + models
+        + storage
+        + metadata
+        + plugins
 
-`/app`
+并且：
+现有功能：
+✅ Telegram扫描
+✅ 文件下载
+✅ 视频播放
+保持可运行。
 
-数据：
-
-`/data`
-
-重要数据：
-
-    /data/files.db
-    /data/accounts
-
-------------------------------------------------------------------------
-
-## 安全注意
-
-禁止提交 Git：
-
-    /data/accounts
-    /data/*.db
-
-原因：
-
-包含 Telegram 登录状态和索引数据。
-
-------------------------------------------------------------------------
-
-## Git Release
-
-提交：
-
-    8c88d59 cleanup v1.0 source cache and temporary files
-
-    3401528 ignore runtime telegram sessions and databases
-
-    aedfdc8 refactor download layer with TelegramDownloader
-
-    629e7fa sync database schema with current production structure
-
-------------------------------------------------------------------------
-
-## 后续方向 v1.1
-
-计划：
-
--   权限系统
--   分享链接
--   文件管理
--   收藏
--   标签
--   下载优化
--   视频信息解析
--   缩略图
--   PostgreSQL 支持
-
-------------------------------------------------------------------------
-
-## 当前状态
-
-Telegram Drive v1.0 Stable Release
-
-核心能力：
-
--   Telegram Storage
--   Multi Account
--   File Index
--   File Download
--   HTTP Range
--   Video Streaming
--   Docker Deployment
--   Production Database
-
-v1.0 已完成封版。
