@@ -35,6 +35,10 @@ jobs:
           print('app import ok')
           PY
 
+      - name: Initialize database schema
+        run: |
+          alembic upgrade head
+
       - name: Alembic check
         run: |
           alembic check
