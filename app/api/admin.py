@@ -1,19 +1,19 @@
-"""Administrative API endpoints.
-
-Phase 2-B exposed read-only management views.
-Phase 2-C adds the first mutation endpoints while keeping the control plane
-small and avoiding authentication coupling at this stage.
-"""
+"""Administrative API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependency import require_admin_api_key
 from app.core.database import get_session
 from app.models import Resource, TelegramAccount, TelegramSource
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin_api_key)],
+)
 
 
 class AccountCreateRequest(BaseModel):
