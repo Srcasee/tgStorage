@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependency import require_admin_api_key
 from app.core.database import get_session
 from app.models import Resource, TelegramAccount, TelegramSource
+from app.models.network import NetworkPlugin
+from app.network.registry import reload_network_selector
 
 router = APIRouter(
     prefix="/admin",
@@ -33,6 +35,10 @@ class SourceCreateRequest(BaseModel):
 
 class ResourceCategoryUpdateRequest(BaseModel):
     category_id: int | None = None
+
+
+class NetworkPluginUpdateRequest(BaseModel):
+    enabled: bool
 
 
 @router.get("/accounts")
@@ -89,3 +95,34 @@ async def update_resource_category(resource_id: int, payload: ResourceCategoryUp
     resource.category_id = payload.category_id
     await session.commit()
     return {"id": resource.id, "category_id": resource.category_id}
+
+
+@router.get("/network/plugins")
+async def list_network_plugins(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(NetworkPlugin))
+    return [
+        {
+            "id": x.id,
+            "name": x.name,
+            "type": x.type,
+            "enabled": x.enabled,
+            "priority": x.priority,
+            "status": x.status,
+        }
+        for x in result.scalars().all()
+    ]
+
+
+@router.patch("/network/plugins/{plugin_id}")
+async def update_network_plugin(plugin_id: int, payload: NetworkPluginUpdateRequest, session: AsyncSession = Depends(get_session)):
+    plugin = await session.get(NetworkPlugin, plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="network plugin not found")
+    plugin.enabled = payload.enabled
+    await session.commit()
+    return {"id": plugin.id, "enabled": plugin.enabled}
+
+
+@router.post("/network/reload")
+async def reload_network_plugins():
+    return {"loaded": reload_network_selector()}
