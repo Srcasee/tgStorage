@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.core.config import settings
+from app.network.registry import get_network_selector
 from app.telegram.client_pool import TelegramClientPool
 from app.telegram.provider import TelegramClientProvider
 from app.telegram.runtime import TelegramClientConfig, TelegramClientRuntime
@@ -22,7 +23,8 @@ def get_runtime() -> TelegramClientRuntime:
                 settings.telegram_api_id,
                 settings.telegram_api_hash,
                 settings.proxy,
-            )
+            ),
+            get_network_selector(),
         )
     return _runtime
 
