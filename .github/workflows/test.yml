@@ -7,11 +7,13 @@ on:
       - main
       - architecture-consolidation
       - 'fix/**'
+      - optimize/**
   pull_request:
     branches:
       - develop
       - main
       - architecture-consolidation
+      - optimize/**
   workflow_dispatch:
 
 permissions:
@@ -38,5 +40,11 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
 
+      - name: Run ruff
+        run: ruff check .
+
+      - name: Run mypy
+        run: mypy app
+
       - name: Run test suite
-        run: python -m pytest -q
+        run: python -m pytest -q --cov=app --cov-report=term-missing
