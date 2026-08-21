@@ -1,4 +1,9 @@
-"""Environment-backed configuration for tgStorage."""
+"""Environment-backed configuration for tgStorage.
+
+This module keeps environment parsing isolated. Legacy proxy variables are
+still accepted for backwards compatibility, but new runtime code should use
+network plugin configuration instead.
+"""
 
 from dataclasses import dataclass
 import os
@@ -6,7 +11,6 @@ import os
 from dotenv import load_dotenv
 
 
-# Load local development configuration without overriding real environment values.
 load_dotenv(override=False)
 
 
@@ -27,6 +31,13 @@ def _env_bool(*names: str, default: bool = False) -> bool:
 
 @dataclass(frozen=True)
 class ProxySettings:
+    """Legacy proxy settings.
+
+    Deprecated: runtime components should eventually resolve proxies through
+    the NetworkPlugin layer. These fields remain to avoid breaking existing
+    deployments during migration.
+    """
+
     enabled: bool = False
     host: str | None = None
     port: int | None = None
