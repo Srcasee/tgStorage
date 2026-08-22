@@ -8,8 +8,14 @@ services:
     volumes:
       - ./data:/data
       - ./app:/app/app
+      - ./plugins:/plugins:ro
     env_file:
       - .env
+    environment:
+      PROXY_PLUGIN_ENABLED: ${PROXY_PLUGIN_ENABLED:-false}
+      PROXY_HOST: ${PROXY_HOST:-proxy}
+      PROXY_PORT: ${PROXY_PORT:-1080}
+      PROXY_TYPE: ${PROXY_TYPE:-socks5}
     ports:
       - "8080:8000"
     networks:
