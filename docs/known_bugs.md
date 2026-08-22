@@ -19,10 +19,31 @@ Tracked during code review.
 - DownloadManager, DownloadEngine and ChunkScheduler responsibilities are fragmented.
 - AccountSelector only checks enabled state and lacks runtime scheduling metrics.
 - ResourceResolver is coupled to Telegram location instead of a generic resource location abstraction.
-- Network plugin is not fully associated with account/network profiles.
 - Core chunk acceleration path lacks regression tests.
 - Provider interface still exposes Telegram-specific identifiers and needs backend abstraction.
 - merger.py and chunk_merger.py have overlapping responsibilities.
+- Network plugin is not connected with download execution policy.
+
+## Network architecture decision
+
+Confirmed:
+
+- All Telegram accounts use the same network policy.
+- Proxy/network selection is a system-level capability, not account-level capability.
+- NetworkPlugin remains hot-swappable.
+- Download v2 should consume system network policy through Telegram Runtime.
+
+Architecture boundary:
+
+```
+Network Policy
+      |
+      v
+Telegram Runtime
+      |
+      v
+All Telegram Accounts
+```
 
 ## Download subsystem architecture notes
 
@@ -48,6 +69,7 @@ Additional findings:
 - DownloadRuntime currently acts mainly as a wrapper and needs redesign around DownloadTask lifecycle.
 - Provider abstraction is valuable and should remain, but backend selection should be generalized.
 - Telegram-specific execution details should move behind backend providers.
+- Telegram Runtime and Network Plugin are reusable foundations for download v2.
 
 Confirmed direction:
 
@@ -64,6 +86,8 @@ Reviewed:
 - scripts
 - requirements
 - app/download core modules
+- Telegram Runtime
+- Network Plugin
 
 Remaining:
 
