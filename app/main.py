@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from app.api.router import router as api_router
 from app.core.config import settings
+from app.download.factory import create_download_service
 from app.indexer.worker import TelegramIndexWorker
 from app.telegram.lifecycle import create_runtime_lifecycle
 
@@ -20,8 +21,9 @@ WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     await runtime_lifecycle.startup()
+    app.state.download_service = await create_download_service(None)
 
     if index_worker_enabled:
         index_worker.start()
