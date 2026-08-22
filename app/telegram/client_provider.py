@@ -17,6 +17,11 @@ class DatabaseTelegramClientProvider:
     def __init__(self, session: AsyncSession, runtime: TelegramClientRuntime, pool: TelegramClientPool) -> None:
         self.session, self.runtime, self.pool = session, runtime, pool
 
+    async def list_accounts(self):
+        stmt = select(TelegramAccount).where(TelegramAccount.enabled.is_(True)).order_by(TelegramAccount.id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_client(self, account_id: int | None = None):
         stmt = select(TelegramAccount).where(TelegramAccount.enabled.is_(True))
         if account_id is not None:
