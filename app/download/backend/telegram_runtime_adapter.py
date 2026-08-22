@@ -48,9 +48,12 @@ class TelegramRuntimeAdapter:
             client: TelegramClient = await self.client_provider.get_client(account_model)
             message = await client.get_messages(chat_id, ids=message_id)
 
+            if message is None or not message.media:
+                raise ValueError("telegram message has no downloadable media")
+
             remaining = limit
             async for chunk in client.iter_download(
-                message,
+                message.media,
                 offset=offset,
                 request_size=chunk_size,
             ):
