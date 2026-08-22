@@ -7,11 +7,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db_session
+from app.download.factory import create_download_service
 from app.download.providers import ResourceLocation
-from app.download.service import DownloadService
-from app.download.backend.telegram_backend import TelegramBackend
 from app.download.resource_resolver import ResourceResolver
-from app.telegram.client_provider import DatabaseTelegramClientProvider
 from app.telegram.runtime_registry import get_pool, get_runtime
 
 router = APIRouter(tags=["download"])
@@ -43,15 +41,6 @@ def _content_disposition(filename: str, resource_id: int) -> str:
     return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
-async def _backend(session: AsyncSession) -> DownloadService:
-    provider = DatabaseTelegramClientProvider(
-        session=session,
-        runtime=get_runtime(),
-        pool=get_pool(),
-    )
-    return DownloadService(TelegramBackend(provider, lambda account: provider.get_account(account)))
-
-
 @router.get("/resources/{resource_id}/download")
 async def download_resource(
     resource_id: int,
@@ -68,7 +57,11 @@ async def download_resource(
     byte_range = _parse_range(range_header, size)
     start, end = byte_range or (0, size - 1)
 
-    service = await _backend(session)
+    service = create_download_service(
+        session=session,
+        runtime=get_runtime(),
+        pool=get_pool(),
+    )
     resource = ResourceLocation(
         resource_id=str(resource_id),
         backend="telegram",
