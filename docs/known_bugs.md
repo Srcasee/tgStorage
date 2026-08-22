@@ -4,77 +4,56 @@ Tracked during code review.
 
 ## Review corrections
 
-- Previous review statements claiming no CI, no pytest foundation, or no migration workflow were incorrect.
-- Repository contains GitHub Actions validation, pytest configuration, and Alembic migration infrastructure.
-- Remaining concerns are coverage depth, quality gates, and consistency verification.
+- CI, pytest and Alembic infrastructure exist.
+- Current concern is not absence of infrastructure, but completeness and consistency.
 
 ## P0
 
 - ConcurrentChunkStream and ChunkScheduler interface mismatch.
 - Telegram client creation path may bypass runtime/network plugin.
-- Multi-account download acceleration is not integrated into the main download path.
-- Account model lacks runtime download scheduling metrics (speed, active tasks, failures).
-- Download API bypasses DownloadManager and directly builds Telegram streaming path.
-
-Additional confirmation:
-
-- `scripts/list-account-dialogs.py` directly constructs `TelegramClient`, creating another client lifecycle entry point outside Runtime Provider.
+- Download acceleration path is not connected as a single production pipeline.
 
 ## P1
 
-- Chunk merger lacks full integrity validation.
-- Resource resolver model limits multi-account download.
-- Streaming lifecycle needs verification.
-- Network plugin is not yet fully associated with account/network profiles.
-- Network quality feedback is missing for dynamic selection.
-- Search service provides database filtering but lacks product-level full-text search strategy.
-- Large-scale indexing may require task queues, retry tracking, and persistent scan jobs.
-- API layer contains download assembly responsibilities; DownloadService/DownloadManager boundary should be enforced.
-- API contracts need formal documentation and stability rules.
-- Admin frontend is currently closer to an API console than a complete management dashboard.
-- Admin frontend lacks complete category management workflow.
-- Admin frontend lacks Telegram runtime status and download metrics display.
-- SQLite may become a scaling bottleneck for very large TG indexes.
-- Deployment proxy runtime integration with NetworkPlugin requires verification.
-- CI exists, but needs stronger quality gates such as linting and static checks.
-- Regression coverage exists for admin, download contracts, headers, runtime validation, and indexer validation, but core acceleration paths still lack sufficient coverage.
-- requirements-dev.txt confirms pytest, pytest-asyncio, pytest-cov, ruff and mypy tooling exists; CI execution of these checks requires verification.
+- Chunk merger lacks integrity validation.
+- DownloadManager, DownloadEngine and ChunkScheduler responsibilities are fragmented.
+- AccountSelector only checks enabled state and lacks runtime scheduling metrics.
+- ResourceResolver is coupled to Telegram location instead of a generic resource location abstraction.
+- Network plugin is not fully associated with account/network profiles.
+- Core chunk acceleration path lacks regression tests.
 
-## P2
+## Download subsystem architecture notes
 
-- Admin frontend authentication integration requires verification.
+Current components exist:
 
-## Architecture review notes
+- ChunkManager
+- ChunkScheduler
+- ChunkMerger
+- ConcurrentStream
+- DownloadEngine
+- DownloadRuntime
+- AccountSelector
+- ResourceResolver
 
-- TelegramAccount identity/session data should remain separate from runtime scheduling metrics.
-- Resource identity design uses source and Telegram message identity boundaries.
-- TelegramSource correctly scopes scanning by account and chat identity.
-- Resource search API provides the core search-to-frontend path.
-- Download API supports HTTP Range delivery.
-- Admin API provides account, source, resource, and network management foundations.
+However, these components do not yet form a stable production pipeline.
+
+Confirmed direction:
+
+- Do not continue incremental patching of the current download subsystem indefinitely.
+- Future download v2 should replace the old execution pipeline.
+- Keep useful abstractions, but redesign scheduling, worker, account selection and backend boundaries.
 
 ## Supplemental review completed
 
 Reviewed:
 
-- tests/
-- docker-compose.prod.yml
-- docker-entrypoint.sh
-- scripts/
-- requirements.txt
-- requirements-dev.txt
+- tests
+- deployment files
+- scripts
+- requirements
+- app/download core modules
 
-Confirmed:
+Remaining:
 
-- pytest infrastructure exists.
-- Production compose exists.
-- Optional proxy deployment profile exists.
-- Container startup performs Alembic migration.
-- scripts/index_telegram_source.py uses runtime provider.
-- requirements-dev.txt provides developer testing and quality tool dependencies.
-
-Remaining review targets:
-
-- tests download path depth
-- CI quality gate execution
-- final architecture validation
+- Finish app/download KEEP / REWRITE / DELETE classification.
+- Design download v2 architecture.
