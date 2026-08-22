@@ -24,18 +24,20 @@ Search API
 Web Frontend
 ```
 
-下载目标架构：
+下载架构重构方向：
 
 ```
 Download API
         |
-Download Manager
+Download Service
         |
-Download Engine
+Download Task
         |
-Chunk Scheduler
+Execution Runtime
         |
-Account Pool
+Scheduler
+        |
+Backend Provider
         |
 Telegram Runtime
         |
@@ -44,102 +46,65 @@ Network Plugin
 
 当前状态：
 
-- Resource 搜索链路已形成基础闭环。
+- Resource/Search 链路已形成基础闭环。
 - Admin、Database、Deployment 基础能力存在。
-- 下载子系统组件较完整，但职责边界未稳定。
-- 未来下载子系统倾向直接重写，不继续在旧链路上无限修补。
-- 网络边界调整：所有 Telegram 账号统一使用同一网络策略，不再设计账号级独立代理绑定。
+- 下载子系统组件较完整，但旧执行链职责混乱。
+- 下载模块保持名称 `app/download`，不创建 `download_v2`。
+- 旧执行实现直接在原模块内替换。
+- 所有 Telegram 账号统一使用同一网络策略，不设计账号级独立代理绑定。
 
 ---
 
-# 2. 下载系统逆向审查结论
+# 2. 下载系统迁移记录
 
-## 可保留设计思想
+已删除：
 
-- ResourceResolver 作为资源定位抽象。
-- AccountSelector 作为账号选择入口。
-- ChunkRange / ChunkManager 的分片思想。
-- DownloadRuntime / Engine 的策略隔离方向。
-- Factory 负责 provider 装配的方向。
-- Provider 抽象方向。
-- Message cache adapter 解耦方向。
-- NetworkPlugin 作为全局网络能力入口。
+- app/download/manager.py
+- app/download/merger.py
+- app/download/concurrent_stream.py
 
-## 需要重写
+原因：
 
-- ConcurrentChunkStream 调度实现。
-- ChunkScheduler 与 Worker 的接口设计。
-- DownloadManager 到 Chunk Engine 的生产链路。
-- Account 调度策略。
-- ChunkMerger 完整性处理。
-- Telegram backend 直接绑定的执行接口。
+- 无稳定外部依赖；
+- 职责由新的 Service / Scheduler / Assembler 结构替代。
 
-## 当前确认问题
+保留并演进：
 
-- ConcurrentChunkStream 调用 ChunkScheduler 接口不一致。
-- DownloadManager 未形成完整加速链路。
-- DownloadEngine 存在但未确认进入主路径。
-- AccountSelector 只有 enabled 检查，没有速度、负载、失败状态调度。
-- ResourceResolver 与 Telegram backend 耦合，需要抽象 ResourceLocation。
-- ChunkMerger 只能保证排序，不能保证数据完整性。
-- providers.py 抽象存在，但接口仍暴露 Telegram 细节。
-- merger.py 与 chunk_merger.py 存在重复职责。
-- NetworkPlugin 已支持插件注册/选择，但当前主要服务于 Telegram client 创建阶段，未参与下载策略决策。
+- chunk.py
+- range.py
+- chunk_manager.py
+- providers.py
+- resource_resolver.py
+- factory.py
+- cache 相关组件
 
 ---
 
-# 3. 已实现功能
-
-已确认：
-
-- Telegram Runtime 基础抽象。
-- Network Plugin 加载入口。
-- Resource/Search 链路。
-- Admin API。
-- Alembic migration。
-- GitHub Actions。
-- pytest 基础设施。
-- Docker production compose。
-- Download HTTP Range。
-- Download contract tests。
-- Chunk 基础组件。
-
----
-
-# 4. 存在的问题
-
-## P0
+# 3. 当前确认问题
 
 - ConcurrentChunkStream 与 ChunkScheduler 接口错误。
 - Telegram client 创建入口分叉。
 - 下载加速链路未形成统一生产路径。
-
-## P1
-
+- AccountSelector 缺少速度、负载、失败状态调度。
+- ResourceResolver 与具体 backend 耦合，需要抽象 ResourceLocation。
 - ChunkMerger 缺少完整性校验。
-- AccountSelector 缺少动态调度能力。
-- ResourceResolver 与具体 backend 耦合。
-- DownloadManager / Engine / Scheduler 边界需要重新设计。
-- 核心 Chunk 调度路径缺少测试覆盖。
-- Network Plugin 与 Download Task 未闭环。
-- Provider 接口需要升级为通用 Backend 接口。
-- Merger 存在重复实现。
+- Provider 接口仍暴露 Telegram 细节。
+- NetworkPlugin 当前主要服务于 Telegram client 创建阶段，需要与下载策略进一步解耦。
 
 ---
 
-# 5. 网络策略决策
+# 4. 网络策略决策
 
 已确定：
 
 - 所有 Telegram 账号共享同一网络策略。
-- Proxy 不再设计为账号级独立配置。
-- NetworkPlugin 保留为系统级热插拔能力。
-- Download v2 只需要选择网络策略，不需要选择账号网络。
+- Proxy 不设计为账号级独立配置。
+- NetworkPlugin 保留系统级热插拔能力。
 
 目标：
 
 ```
-System Network Policy
+System Network Plugin
         |
         v
 Telegram Runtime
@@ -160,10 +125,7 @@ All Accounts
 - docker
 - scripts
 - requirements
-- app/download 初步逆向架构审查
+- app/download 架构审查
 - Telegram Runtime → Network Plugin → Download Backend 边界审查
-
-当前继续：
-
-- app/download KEEP / REWRITE / DELETE 分类
-- 设计 download v2 架构
+- 下载旧代码引用扫描
+- 第一阶段迁移删除
