@@ -2,51 +2,40 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Iterable, Protocol
+from typing import Iterable, Protocol
 
 from .chunk_manager import ChunkRange
 
 
 class ChunkWorker(Protocol):
-    """Execute a single chunk range fetch."""
-
     async def fetch(self, chunk: ChunkRange) -> bytes:
         ...
 
 
 @dataclass
 class ChunkResult:
-    """Result returned after executing a chunk range."""
-
     chunk: ChunkRange
     data: bytes
 
 
 class ChunkScheduler:
-    """Schedule chunk execution without coupling to storage providers.
+    """Coordinates chunk workers.
 
-    The scheduler only coordinates chunk execution. A worker may later be
-    backed by Telegram, local storage, or remote distributed workers.
+    Scheduling is independent from Telegram and network implementations.
     """
 
-    def __init__(
-        self,
-        worker: ChunkWorker,
-        max_concurrency: int = 4,
-    ) -> None:
+    def __init__(self, worker: ChunkWorker, max_concurrency: int = 4) -> None:
         self.worker = worker
         self.max_concurrency = max(1, max_concurrency)
 
-    async def execute(
-        self,
-        chunks: Iterable[ChunkRange],
-    ) -> list[ChunkResult]:
+    async def execute(self, chunks: Iterable[ChunkRange]) -> list[ChunkResult]:
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
         async def run(chunk: ChunkRange) -> ChunkResult:
             async with semaphore:
-                data = await self.worker.fetch(chunk)
-                return ChunkResult(chunk=chunk, data=data)
+                return ChunkResult(
+                    chunk=chunk,
+                    data=await self.worker.fetch(chunk),
+                )
 
-        results = await asyncio.gather(*(run(chunk) for chunk in chunks))
-        return list(results)
+        return list(await asyncio.gather(*(run(chunk) for chunk in chunks)))
