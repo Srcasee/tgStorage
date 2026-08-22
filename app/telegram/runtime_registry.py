@@ -22,7 +22,6 @@ def get_runtime() -> TelegramClientRuntime:
             TelegramClientConfig(
                 settings.telegram_api_id,
                 settings.telegram_api_hash,
-                settings.proxy,
             ),
             get_network_selector(),
         )
