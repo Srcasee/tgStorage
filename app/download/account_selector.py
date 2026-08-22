@@ -4,7 +4,7 @@ The scheduler chooses Telegram accounts only. Network selection remains a
 system-level concern owned by Telegram runtime.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable
 
 
@@ -17,14 +17,22 @@ class AccountState:
 
 
 class AccountScheduler:
-    """Select an account for a download chunk/task.
-
-    Future scoring can include speed, FloodWait and runtime health metrics.
-    It deliberately does not handle proxy/network decisions.
-    """
+    """Select and track Telegram accounts for download execution."""
 
     def __init__(self, accounts: Iterable[object] | None = None) -> None:
-        self.accounts = [AccountState(account=a) for a in (accounts or [])]
+        self.accounts: list[AccountState] = []
+        self.refresh(accounts or [])
+
+    def refresh(self, accounts: Iterable[object]) -> None:
+        """Replace account snapshot without replacing scheduler state owner."""
+        current = {
+            item.account: item
+            for item in self.accounts
+        }
+        self.accounts = []
+        for account in accounts:
+            state = current.get(account)
+            self.accounts.append(state or AccountState(account=account))
 
     async def select(self) -> object | None:
         available = [
@@ -48,5 +56,4 @@ class AccountScheduler:
                 return
 
 
-# Backward-compatible alias during migration.
 AccountSelector = AccountScheduler
