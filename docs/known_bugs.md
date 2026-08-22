@@ -21,6 +21,8 @@ Tracked during code review.
 - ResourceResolver is coupled to Telegram location instead of a generic resource location abstraction.
 - Network plugin is not fully associated with account/network profiles.
 - Core chunk acceleration path lacks regression tests.
+- Provider interface still exposes Telegram-specific identifiers and needs backend abstraction.
+- merger.py and chunk_merger.py have overlapping responsibilities.
 
 ## Download subsystem architecture notes
 
@@ -35,6 +37,7 @@ Current components exist:
 - AccountSelector
 - ResourceResolver
 - Provider factory
+- Message cache adapter
 
 However, these components do not yet form a stable production pipeline.
 
@@ -44,6 +47,7 @@ Additional findings:
 - ChunkMerger restores ordering but lacks content integrity verification.
 - DownloadRuntime currently acts mainly as a wrapper and needs redesign around DownloadTask lifecycle.
 - Provider abstraction is valuable and should remain, but backend selection should be generalized.
+- Telegram-specific execution details should move behind backend providers.
 
 Confirmed direction:
 
