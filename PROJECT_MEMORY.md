@@ -47,6 +47,8 @@ Network Plugin
 - 下载组件已存在 Chunk、Stream、Runtime 抽象，但多账号加速主链路仍未完全闭环。
 - 生产部署已具备 Docker Compose、数据库迁移入口和可选 proxy 容器。
 - CI、pytest、Alembic 均已确认存在。
+- scripts 中 index_telegram_source.py 已接入 runtime_registry/get_provider，不属于旧式直连客户端路径。
+- scripts/list-account-dialogs.py 仍存在直接 TelegramClient 创建路径，需要后续统一。
 
 ---
 
@@ -71,14 +73,7 @@ Network Plugin
 - pytest 测试基础设施
 - Docker production compose
 - entrypoint 自动执行 migration
-
-测试覆盖方向：
-
-- Admin API
-- Download API contract
-- Download headers
-- Download runtime validation
-- Indexer validation
+- scripts/index_telegram_source.py 使用 Runtime Provider 执行索引
 
 ---
 
@@ -90,17 +85,9 @@ Network Plugin
 
 旧 client 创建路径可能绕过 Runtime 和 Network Plugin。
 
-需要统一：
+新增确认：
 
-```
-Account
-  |
-Client Provider
-  |
-Runtime
-  |
-Network Selector
-```
+`scripts/list-account-dialogs.py` 直接调用 `TelegramClient(...)`，需要后续改造为统一 Provider。
 
 ---
 
@@ -141,7 +128,7 @@ Chunk Merger
 - CI 已存在，但需要增加 lint/static analysis。
 - 测试存在，但核心下载加速路径覆盖不足。
 - docker proxy 容器存在，但与 NetworkPlugin runtime 关联仍需验证。
-- scripts 中部分运维入口需要确认是否仍符合多账号架构。
+- requirements.txt 已包含运行依赖，但开发测试工具链需进一步确认。
 
 ---
 
@@ -156,6 +143,8 @@ Chunk Merger
 - tests/
 - docker-compose.prod.yml
 - docker-entrypoint.sh
+- scripts/
+- requirements.txt
 
 结论：
 
@@ -165,21 +154,23 @@ Chunk Merger
 - production compose 存在。
 - proxy 使用可选 profile。
 - entrypoint 使用 Alembic upgrade head。
+- scripts/index_telegram_source.py 遵循 Runtime Provider 架构。
+- scripts/list-account-dialogs.py 仍需要迁移到统一 Runtime 架构。
 
 仍需补充：
 
-- requirements
-- scripts 与生产流程一致性
+- 深度审查 tests/download 核心覆盖
 - Chunk Scheduler
 - ConcurrentChunkStream
 - 多账号并行下载
 - Network Plugin runtime switching
+- requirements-dev/tooling
 
 ---
 
 ## 下一步审查范围
 
-- requirements
-- scripts
+- tests 深度审查
+- requirements-dev
 - 最终架构复盘
 - 修复计划重新制定
