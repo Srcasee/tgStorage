@@ -16,6 +16,10 @@ Tracked during code review.
 - Account model lacks runtime download scheduling metrics (speed, active tasks, failures).
 - Download API bypasses DownloadManager and directly builds Telegram streaming path.
 
+Additional confirmation:
+
+- `scripts/list-account-dialogs.py` directly constructs `TelegramClient`, creating another client lifecycle entry point outside Runtime Provider.
+
 ## P1
 
 - Chunk merger lacks full integrity validation.
@@ -34,6 +38,7 @@ Tracked during code review.
 - Deployment proxy runtime integration with NetworkPlugin requires verification.
 - CI exists, but needs stronger quality gates such as linting and static checks.
 - Regression coverage exists for admin, download contracts, headers, runtime validation, and indexer validation, but core acceleration paths still lack sufficient coverage.
+- requirements.txt contains runtime dependencies, but developer tooling dependencies need separate verification.
 
 ## P2
 
@@ -55,6 +60,8 @@ Reviewed:
 - tests/
 - docker-compose.prod.yml
 - docker-entrypoint.sh
+- scripts/
+- requirements.txt
 
 Confirmed:
 
@@ -62,9 +69,10 @@ Confirmed:
 - Production compose exists.
 - Optional proxy deployment profile exists.
 - Container startup performs Alembic migration.
+- scripts/index_telegram_source.py uses runtime provider.
 
 Remaining review targets:
 
-- scripts/
-- requirements
+- tests download path depth
+- requirements-dev/tooling
 - final architecture validation
