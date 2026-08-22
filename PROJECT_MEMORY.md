@@ -1,196 +1,110 @@
 # tgStorage 项目审查记忆
 
-> 用于持续代码审查记录。每次审查后更新本文件，直到完成整体代码审计。
+> 持续代码审查记录。
 
 ## 1. 项目架构
 
-当前目标架构：
+当前 Telegram 架构：
 
 ```
-Telegram Storage Source
+Telegram Client Runtime
         |
- Telegram Client Runtime
+Client Provider
         |
- Resource Index / Metadata Layer
+Client Pool
         |
-        API
-        |
- Web Frontend
-        |
- User Search / Download / Preview
-```
-
-管理链路：
-
-```
-Admin Web
-    |
-Resource Management
-    |
-Telegram Account Management
-    |
-Category Management
-```
-
-下载链路当前实现：
-
-```
-FastAPI Download API
-        |
-TelegramStreamBackend
-        |
-TelegramChunkReader
-        |
-RuntimeTelegramFileProvider
-        |
-Telegram Client
+Download Provider
         |
 Telegram Storage
 ```
 
-核心模块：
-
-- api: HTTP API 层
-- download: 下载引擎、chunk、stream、scheduler 抽象
-- telegram: Telegram runtime/client 管理
-- admin: 管理后台
-- cache: 消息及媒体缓存
-- models/services: 业务模型与服务层
-
-目标扩展架构：
+目标下载架构：
 
 ```
 Download Manager
         |
- Chunk Scheduler
+Account Selector
         |
- +-------------+-------------+
- |             |             |
-TG Account A TG Account B TG Account C
- |             |             |
-Workers     Workers      Workers
++---------+---------+
+|         |         |
+TG A     TG B      TG C
+|         |         |
+Workers Workers Workers
         |
- Chunk Merger
+Chunk Merger
         |
- User Stream
+User Stream
 ```
 
-Proxy/network 目标架构：
+Network 插件入口已存在：
 
 ```
-Telegram Client
-       |
- Network Plugin Interface
-       |
- +---------+----------+----------+
- Direct   SOCKS5     HTTP Proxy
+Telegram Runtime Lifecycle
+        |
+Network Selector
+        |
+Network Plugins
 ```
-
----
 
 ## 2. 已实现功能
 
-### 已完成
+已完成：
 
-- Telegram 文件 Provider 抽象
-- Telegram Runtime Client 接入
-- Resource API 基础能力
-- Download Streaming 基础能力
-- HTTP Range 下载基础支持
-- Chunk Reader
-- Chunk Scheduler 基础结构
-- Chunk Merger 基础结构
-- Concurrent Stream 基础结构
-- Download Runtime/Factory 基础结构
-- Telegram 多账号方向设计
-- Admin 后台基础目录
-- 数据库迁移体系
-- Docker 部署体系
+- Telegram Client Pool 基础抽象
+- Database Telegram Client Provider
+- 多账号查询能力
+- Telegram Runtime 生命周期管理
+- Network Plugin 加载入口
+- Client authorization 检查
+- 账号状态更新
 
-### 部分完成
+部分完成：
 
 - 多账号并行下载
-- 下载调度优化
-- Proxy 插件系统
-- 资源分类管理
-- 用户 Web 前端
-- 搜索体验
+- 动态账号选择
+- Proxy 热插拔完整流程
+- 下载速度优化策略
 
----
-
-## 3. 当前存在的问题
+## 3. 存在的问题
 
 ### P0
 
-1. 下载链路仍偏向单账号直接流式读取。
+1. Telegram client.py 仍存在旧版实现和新 runtime 架构并存问题。
 
-需要进一步接入：
+旧实现直接创建 TelethonClient，并直接注入 proxy，可能绕过新的 Network Plugin 架构。
 
-- Download Manager
-- Chunk Scheduler
-- Multi Account Worker
-- Retry/Resume
+2. 多账号目前主要用于选择 client，而未接入 chunk worker 调度。
 
-2. StreamingResponse 生命周期风险。
+需要：
 
-需要检查：
-
-- 数据库 session 生命周期
-- 长连接释放
-- 下载取消清理
-
-3. Telegram 资源异常处理不足。
-
-需要完善：
-
-- deleted message
-- missing media
-- Telegram API error
-
+- Account Pool
+- Worker binding
+- Download scheduler integration
 
 ### P1
 
-1. Proxy 插件化未完整落地。
+1. ClientPool 缺少：
 
-需要：
+- 负载统计
+- 下载速度统计
+- 错误次数
+- 自动降级
 
-- NetworkPlugin interface
-- Plugin registry
-- 热插拔机制
-- Direct/SOCKS5/HTTP 支持
+2. Network Plugin 虽有 lifecycle 接入，但需要继续检查实际 provider 使用链路。
 
-2. Resource Domain 需要增强。
-
-需要：
-
-- 分类
-- 标签
-- 搜索索引
-- 账号维度管理
-
-3. 用户 Web 产品层不足。
-
-需要：
-
-- 搜索页面
-- 下载页面
-- 资源详情
-
----
+3. 需要统一 Telegram client 创建入口，避免旧代码和新架构分叉。
 
 ## 审查记录
 
-### 第一次审查
+### 第二次审查
 
 范围：
 
-- download/telegram_file_provider.py
-- download/telegram_reader.py
-- download/telegram.py
-- api/download.py
+- app/telegram/client.py
+- app/telegram/client_pool.py
+- app/telegram/client_provider.py
+- app/telegram/lifecycle.py
 
 结论：
 
-当前架构方向符合 TG 云存储系统目标，但下载加速、多账号并发、网络插件、用户产品层仍未完成。
-
-后续审查继续更新本文件。
+Telegram 多账号和网络插件方向已经开始落地，但下载加速仍未形成完整闭环。当前最大风险是旧 client 创建逻辑与新 runtime/provider 架构并存。
