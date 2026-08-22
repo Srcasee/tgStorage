@@ -46,6 +46,7 @@ Network Plugin
 - Admin API 已提供账号、Source、Resource、Network 管理基础。
 - 下载组件已存在 Chunk、Stream、Runtime 抽象，但多账号加速主链路仍未完全闭环。
 - 生产部署已具备 Docker Compose、数据库迁移入口和可选 proxy 容器。
+- CI、pytest、Alembic 均已确认存在。
 
 ---
 
@@ -150,33 +151,35 @@ Chunk Merger
 
 范围：
 
+- .github/workflows
+- alembic/
 - tests/
 - docker-compose.prod.yml
 - docker-entrypoint.sh
-- scripts/
 
 结论：
 
-测试基础设施存在，不再认为项目缺少测试体系。
-
-部署确认：
-
+- CI 基础存在，不再认为项目缺少 CI。
+- pytest 基础设施存在，测试覆盖方向已确认。
+- Alembic migration 存在，数据库演进机制已建立。
 - production compose 存在。
 - proxy 使用可选 profile。
 - entrypoint 使用 Alembic upgrade head。
 
 仍需补充：
 
+- requirements
+- scripts 与生产流程一致性
 - Chunk Scheduler
 - ConcurrentChunkStream
 - 多账号并行下载
 - Network Plugin runtime switching
-- scripts 与生产运行流程一致性
 
 ---
 
 ## 下一步审查范围
 
 - requirements
+- scripts
 - 最终架构复盘
 - 修复计划重新制定
