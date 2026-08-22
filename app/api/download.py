@@ -19,17 +19,29 @@ def _parse_range(value: str | None, size: int) -> tuple[int, int] | None:
         return None
     if not value.startswith("bytes=") or "," in value:
         raise HTTPException(status_code=416, detail="invalid Range header")
+
     spec = value[6:].strip()
     if "-" not in spec:
         raise HTTPException(status_code=416, detail="invalid Range header")
+
     start_text, end_text = spec.split("-", 1)
     try:
-        start = int(start_text)
-        end = int(end_text) if end_text else size - 1
+        if start_text == "":
+            # suffix-byte-range-spec: bytes=-N
+            suffix = int(end_text)
+            if suffix <= 0:
+                raise ValueError
+            start = max(size - suffix, 0)
+            end = size - 1
+        else:
+            start = int(start_text)
+            end = int(end_text) if end_text else size - 1
     except ValueError as exc:
         raise HTTPException(status_code=416, detail="invalid Range header") from exc
+
     if start < 0 or end < start or start >= size:
         raise HTTPException(status_code=416, detail="range not satisfiable")
+
     return start, min(end, size - 1)
 
 
