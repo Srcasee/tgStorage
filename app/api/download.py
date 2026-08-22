@@ -10,7 +10,6 @@ from app.core.dependencies import get_db_session
 from app.download.factory import create_download_service
 from app.download.providers import ResourceLocation
 from app.download.resource_resolver import ResourceResolver
-from app.telegram.runtime_registry import get_pool, get_runtime
 
 router = APIRouter(tags=["download"])
 
@@ -57,11 +56,7 @@ async def download_resource(
     byte_range = _parse_range(range_header, size)
     start, end = byte_range or (0, size - 1)
 
-    service = create_download_service(
-        session=session,
-        runtime=get_runtime(),
-        pool=get_pool(),
-    )
+    service = create_download_service(session)
 
     resource = ResourceLocation(
         resource_id=str(location.resource_id),
