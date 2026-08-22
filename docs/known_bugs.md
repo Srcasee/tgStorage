@@ -2,72 +2,58 @@
 
 Tracked during code review.
 
+## Review corrections
+
+- Previous review statements claiming no CI, no pytest foundation, or no migration workflow were incorrect.
+- Repository contains GitHub Actions validation, pytest configuration, and Alembic migration infrastructure.
+- Remaining concerns are coverage depth, quality gates, and consistency verification.
+
 ## P0
 
 - ConcurrentChunkStream and ChunkScheduler interface mismatch.
 - Telegram client creation path may bypass runtime/network plugin.
-- Multi-account download acceleration is not integrated.
+- Multi-account download acceleration is not integrated into the main download path.
 - Account model lacks runtime download scheduling metrics (speed, active tasks, failures).
-- Download API bypasses DownloadManager and directly builds Telegram streaming path, preventing the intended multi-account acceleration pipeline.
-- Database layer and ORM model evolution strategy is unclear; schema initialization relies on runtime CREATE TABLE logic.
+- Download API bypasses DownloadManager and directly builds Telegram streaming path.
 
 ## P1
 
 - Chunk merger lacks full integrity validation.
 - Resource resolver model limits multi-account download.
 - Streaming lifecycle needs verification.
-- Network plugin is not yet associated with account/network profiles.
+- Network plugin is not yet fully associated with account/network profiles.
 - Network quality feedback is missing for dynamic selection.
-- Search service currently provides lightweight database filtering only; no full-text index, ranking, or advanced user search strategy.
-- Indexer commits resources directly during scan flow; large-scale indexing may need task queues, retry tracking, and scan job persistence.
+- Search service provides database filtering but lacks product-level full-text search strategy.
+- Large-scale indexing may require task queues, retry tracking, and persistent scan jobs.
 - API layer contains download assembly responsibilities; DownloadService/DownloadManager boundary should be enforced.
-- API contracts need formal documentation for Resource, Download, and Admin DTO stability.
-- Admin frontend is currently an API validation console rather than a complete management dashboard.
-- Admin frontend lacks category management UI for resource classification workflows.
-- Admin frontend does not expose Telegram account runtime status, health, or download metrics.
-- SQLite deployment may become a bottleneck for very large TG storage indexes; migration path to PostgreSQL should be considered.
-- No clear database migration workflow was confirmed; schema changes may depend on application startup.
-- Deployment proxy container exists, but runtime selection and application integration need further verification.
-- Automated test coverage was not found during repository scan; core download, Telegram runtime, API, and indexing paths lack confirmed regression tests.
-- CI/CD workflow configuration was not found during repository scan; automated quality gates and deployment checks need to be established.
+- API contracts need formal documentation and stability rules.
+- Admin frontend is currently closer to an API console than a complete management dashboard.
+- Admin frontend lacks complete category management workflow.
+- Admin frontend lacks Telegram runtime status and download metrics display.
+- SQLite may become a scaling bottleneck for very large TG indexes.
+- Deployment proxy runtime integration with NetworkPlugin requires verification.
+- Automated regression coverage for download, Telegram runtime, API, and indexing paths is insufficient.
+- CI exists, but needs stronger quality gates such as test execution coverage, linting, and static checks.
 
 ## P2
 
-- Admin frontend authentication flow is incomplete; frontend integration with admin authentication needs verification.
+- Admin frontend authentication integration requires verification.
 
-## Models review notes
+## Architecture review notes
 
-- TelegramAccount currently stores identity/session/status only; acceleration-related runtime state should remain outside the ORM or be introduced deliberately.
-- Resource identity design is correct: source_id + telegram_chat_id + telegram_message_id uniqueness is enforced.
+- TelegramAccount identity/session data should remain separate from runtime scheduling metrics.
+- Resource identity design uses source and Telegram message identity boundaries.
 - TelegramSource correctly scopes scanning by account and chat identity.
-
-## Indexer and search review notes
-
-- TelegramResourceIndexer correctly enforces source/chat identity boundaries and maintains incremental scan cursors.
-- Resource metadata classification and category resolution are already connected.
-- ResourceSearchService supports filename, extension, category, and resource type filtering, but does not yet provide a product-level search experience.
-
-## API review notes
-
 - Resource search API provides the core search-to-frontend path.
-- Download API supports HTTP Range requests and partial content delivery.
-- Admin API provides account, source, resource category, and network plugin management foundations.
-- Admin API still requires verification against the final admin frontend requirements.
+- Download API supports HTTP Range delivery.
+- Admin API provides account, source, resource, and network management foundations.
 
-## Admin frontend review notes
+## Additional files requiring review
 
-- Frontend currently covers account creation, source creation, and resource listing validation flows.
-- Account update/delete and source update/delete handlers exist in JavaScript but are not represented as complete UI workflows.
-- Network plugin management exists at API level but has no complete frontend operations panel.
-
-## Database and deployment review notes
-
-- Current database initialization creates SQLite tables at runtime and enables WAL mode.
-- Docker deployment provides persistent /data volume and optional proxy profile.
-- Production migration, backup, scaling, and database upgrade strategy require formal documentation.
-
-## Test and CI review notes
-
-- Repository scan did not identify a test suite or pytest-based regression framework.
-- No GitHub Actions workflow was identified for automated checks.
-- Before large refactoring, add tests around Resource indexing, Telegram client lifecycle, DownloadManager routing, Range streaming, and Admin API permissions.
+- .github/workflows/
+- alembic/
+- tests/
+- docker-compose.prod.yml
+- docker-entrypoint.sh
+- scripts/
+- requirements
