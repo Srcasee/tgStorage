@@ -36,13 +36,15 @@ class TelegramBackend(DownloadBackend):
         if account_id is None:
             raise ValueError("account_id is required for telegram backend")
 
+        metadata = location.metadata or {}
+        chat_id = metadata.get("chat_id")
+        message_id = metadata.get("message_id")
+        if chat_id is None or message_id is None:
+            raise ValueError("telegram resource metadata requires chat_id and message_id")
+
         account = await self.account_loader(account_id)
         client: TelegramClient = await self.client_provider.get_client(account)
-
-        message = await client.get_messages(
-            location.chat_id,
-            ids=location.message_id,
-        )
+        message = await client.get_messages(chat_id, ids=message_id)
 
         remaining = limit
         async for chunk in client.iter_download(
