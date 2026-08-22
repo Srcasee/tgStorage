@@ -59,6 +59,7 @@ Network Plugin
 - AccountSelector 作为账号选择入口。
 - ChunkRange / ChunkManager 的分片思想。
 - DownloadRuntime / Engine 的策略隔离方向。
+- Factory 负责 provider 装配的方向。
 
 ## 需要重写
 
@@ -66,6 +67,7 @@ Network Plugin
 - ChunkScheduler 与 Worker 的接口设计。
 - DownloadManager 到 Chunk Engine 的生产链路。
 - Account 调度策略。
+- ChunkMerger 完整性处理。
 
 ## 当前确认问题
 
@@ -74,6 +76,7 @@ Network Plugin
 - DownloadEngine 存在但未确认进入主路径。
 - AccountSelector 只有 enabled 检查，没有速度、负载、失败状态调度。
 - ResourceResolver 与 Telegram backend 耦合，需要抽象 ResourceLocation。
+- ChunkMerger 只能保证排序，不能保证数据完整性。
 
 ---
 
