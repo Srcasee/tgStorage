@@ -44,7 +44,8 @@ Network Plugin
 
 - Resource 搜索链路已形成基础闭环。
 - Admin API 已提供账号、Source、Resource、Network 管理基础。
-- 下载组件已存在 Chunk、Stream、Runtime 抽象，但多账号加速主链路仍需确认。
+- 下载组件已存在 Chunk、Stream、Runtime 抽象，但多账号加速主链路仍未完全闭环。
+- 生产部署已具备 Docker Compose、数据库迁移入口和可选 proxy 容器。
 
 ---
 
@@ -67,10 +68,10 @@ Network Plugin
 - Alembic migration
 - GitHub Actions CI
 - pytest 测试基础设施
+- Docker production compose
+- entrypoint 自动执行 migration
 
-测试体系已确认存在：
-
-覆盖方向包括：
+测试覆盖方向：
 
 - Admin API
 - Download API contract
@@ -85,8 +86,6 @@ Network Plugin
 ## P0
 
 ### Telegram client 创建入口分叉
-
-问题：
 
 旧 client 创建路径可能绕过 Runtime 和 Network Plugin。
 
@@ -105,16 +104,6 @@ Network Selector
 ---
 
 ### 下载加速链路未完全闭环
-
-当前：
-
-```
-Resource
- |
-Download
- |
-Telegram
-```
 
 目标：
 
@@ -136,11 +125,6 @@ Chunk Merger
 
 ### ConcurrentChunkStream 接口风险
 
-位置：
-
-- app/download/concurrent_stream.py
-- app/download/chunk_scheduler.py
-
 需要修正接口一致性并增加测试。
 
 ---
@@ -155,6 +139,8 @@ Chunk Merger
 - 搜索能力需要长期全文检索方案。
 - CI 已存在，但需要增加 lint/static analysis。
 - 测试存在，但核心下载加速路径覆盖不足。
+- docker proxy 容器存在，但与 NetworkPlugin runtime 关联仍需验证。
+- scripts 中部分运维入口需要确认是否仍符合多账号架构。
 
 ---
 
@@ -165,18 +151,19 @@ Chunk Merger
 范围：
 
 - tests/
+- docker-compose.prod.yml
+- docker-entrypoint.sh
+- scripts/
 
 结论：
 
 测试基础设施存在，不再认为项目缺少测试体系。
 
-已确认测试覆盖：
+部署确认：
 
-- Admin API
-- Download API
-- Streaming contract
-- Runtime validation
-- Indexer validation
+- production compose 存在。
+- proxy 使用可选 profile。
+- entrypoint 使用 Alembic upgrade head。
 
 仍需补充：
 
@@ -184,12 +171,12 @@ Chunk Merger
 - ConcurrentChunkStream
 - 多账号并行下载
 - Network Plugin runtime switching
+- scripts 与生产运行流程一致性
 
 ---
 
 ## 下一步审查范围
 
-- docker-compose.prod.yml
-- docker-entrypoint.sh
-- scripts/
 - requirements
+- 最终架构复盘
+- 修复计划重新制定
