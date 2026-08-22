@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from app.api.router import router as api_router
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.download.factory import create_download_service
 from app.indexer.worker import TelegramIndexWorker
 from app.telegram.lifecycle import create_runtime_lifecycle
@@ -23,22 +24,25 @@ WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await runtime_lifecycle.startup()
-    app.state.download_service = await create_download_service(None)
 
-    if index_worker_enabled:
-        index_worker.start()
-    else:
-        print(
-            "[INDEX] Telegram API credentials are not configured; scanner disabled",
-            flush=True,
-        )
+    async with SessionLocal() as session:
+        app.state.download_service = await create_download_service(session)
 
-    try:
-        yield
-    finally:
         if index_worker_enabled:
-            await index_worker.stop()
-        await runtime_lifecycle.shutdown()
+            index_worker.start()
+        else:
+            print(
+                "[INDEX] Telegram API credentials are not configured; scanner disabled",
+                flush=True,
+            )
+
+        try:
+            yield
+        finally:
+            if index_worker_enabled:
+                await index_worker.stop()
+
+    await runtime_lifecycle.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
