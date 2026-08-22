@@ -21,6 +21,13 @@ Tracked during code review.
 - Indexer commits resources directly during scan flow; large-scale indexing may need task queues, retry tracking, and scan job persistence.
 - API layer contains download assembly responsibilities; DownloadService/DownloadManager boundary should be enforced.
 - API contracts need formal documentation for Resource, Download, and Admin DTO stability.
+- Admin frontend is currently an API validation console rather than a complete management dashboard.
+- Admin frontend lacks category management UI for resource classification workflows.
+- Admin frontend does not expose Telegram account runtime status, health, or download metrics.
+
+## P2
+
+- Admin frontend authentication flow is incomplete; frontend integration with admin authentication needs verification.
 
 ## Models review notes
 
@@ -40,3 +47,9 @@ Tracked during code review.
 - Download API supports HTTP Range requests and partial content delivery.
 - Admin API provides account, source, resource category, and network plugin management foundations.
 - Admin API still requires verification against the final admin frontend requirements.
+
+## Admin frontend review notes
+
+- Frontend currently covers account creation, source creation, and resource listing validation flows.
+- Account update/delete and source update/delete handlers exist in JavaScript but are not represented as complete UI workflows.
+- Network plugin management exists at API level but has no complete frontend operations panel.
