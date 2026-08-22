@@ -34,8 +34,16 @@ Current components exist:
 - DownloadRuntime
 - AccountSelector
 - ResourceResolver
+- Provider factory
 
 However, these components do not yet form a stable production pipeline.
+
+Additional findings:
+
+- ChunkManager is a reusable range planning component and should be retained.
+- ChunkMerger restores ordering but lacks content integrity verification.
+- DownloadRuntime currently acts mainly as a wrapper and needs redesign around DownloadTask lifecycle.
+- Provider abstraction is valuable and should remain, but backend selection should be generalized.
 
 Confirmed direction:
 
