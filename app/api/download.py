@@ -49,7 +49,7 @@ async def download_resource(
 ):
     resolver = ResourceResolver(session)
     try:
-        location = await resolver.resolve_telegram(resource_id)
+        location = await resolver.resolve(resource_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -62,14 +62,11 @@ async def download_resource(
         runtime=get_runtime(),
         pool=get_pool(),
     )
+
     resource = ResourceLocation(
-        resource_id=str(resource_id),
-        backend="telegram",
-        metadata={
-            "chat_id": location.chat_id,
-            "message_id": location.message_id,
-            "account_id": location.account_id,
-        },
+        resource_id=str(location.resource_id),
+        backend=location.backend,
+        metadata=location.metadata,
     )
 
     stream = service.stream(resource, offset=start, limit=end - start + 1)
