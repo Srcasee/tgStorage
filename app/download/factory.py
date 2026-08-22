@@ -10,18 +10,15 @@ from app.telegram.client_provider import DatabaseTelegramClientProvider
 from app.telegram.runtime_registry import get_pool, get_runtime
 
 
-async def load_accounts(provider):
-    return await provider.list_accounts()
-
-
-def create_download_service(session) -> DownloadService:
+async def create_download_service(session) -> DownloadService:
     """Create download service with isolated runtime dependencies."""
     provider = DatabaseTelegramClientProvider(
         session=session,
         runtime=get_runtime(),
         pool=get_pool(),
     )
-    scheduler = AccountScheduler()
+    accounts = await provider.list_accounts()
+    scheduler = AccountScheduler(accounts)
     runtime_adapter = TelegramRuntimeAdapter(
         provider,
         scheduler,
