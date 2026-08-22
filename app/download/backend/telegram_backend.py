@@ -1,29 +1,18 @@
-"""Telegram download backend adapter.
-
-Keeps Telegram-specific streaming details behind the download backend boundary.
-"""
+"""Telegram download backend boundary."""
 
 from __future__ import annotations
 
-from typing import AsyncIterator, Awaitable, Callable
+from typing import AsyncIterator
 
-from telethon import TelegramClient
-
+from app.download.backend.telegram_runtime_adapter import TelegramRuntimeAdapter
 from app.download.providers import DownloadBackend, ResourceLocation
-from app.models.account import TelegramAccount
-from app.telegram.provider import TelegramClientProvider
 
 
 class TelegramBackend(DownloadBackend):
-    """Backend adapter that reads bytes from Telegram runtime."""
+    """Backend facade that delegates Telegram execution to runtime adapter."""
 
-    def __init__(
-        self,
-        client_provider: TelegramClientProvider,
-        account_loader: Callable[[int], Awaitable[TelegramAccount]],
-    ):
-        self.client_provider = client_provider
-        self.account_loader = account_loader
+    def __init__(self, runtime_adapter: TelegramRuntimeAdapter):
+        self.runtime_adapter = runtime_adapter
 
     async def stream(
         self,
@@ -33,30 +22,11 @@ class TelegramBackend(DownloadBackend):
         chunk_size: int = 256 * 1024,
         account_id: int | None = None,
     ) -> AsyncIterator[bytes]:
-        if account_id is None:
-            raise ValueError("account_id is required for telegram backend")
-
-        metadata = location.metadata or {}
-        chat_id = metadata.get("chat_id")
-        message_id = metadata.get("message_id")
-        if chat_id is None or message_id is None:
-            raise ValueError("telegram resource metadata requires chat_id and message_id")
-
-        account = await self.account_loader(account_id)
-        client: TelegramClient = await self.client_provider.get_client(account)
-        message = await client.get_messages(chat_id, ids=message_id)
-
-        remaining = limit
-        async for chunk in client.iter_download(
-            message,
+        async for chunk in self.runtime_adapter.stream(
+            location,
             offset=offset,
-            request_size=chunk_size,
+            limit=limit,
+            chunk_size=chunk_size,
+            account_id=account_id,
         ):
-            if remaining is not None:
-                if remaining <= 0:
-                    break
-                chunk = chunk[:remaining]
-                remaining -= len(chunk)
-
-            if chunk:
-                yield bytes(chunk)
+            yield chunk
