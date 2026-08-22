@@ -9,6 +9,7 @@ Tracked during code review.
 - Multi-account download acceleration is not integrated.
 - Account model lacks runtime download scheduling metrics (speed, active tasks, failures).
 - Download API bypasses DownloadManager and directly builds Telegram streaming path, preventing the intended multi-account acceleration pipeline.
+- Database layer and ORM model evolution strategy is unclear; schema initialization relies on runtime CREATE TABLE logic.
 
 ## P1
 
@@ -24,6 +25,9 @@ Tracked during code review.
 - Admin frontend is currently an API validation console rather than a complete management dashboard.
 - Admin frontend lacks category management UI for resource classification workflows.
 - Admin frontend does not expose Telegram account runtime status, health, or download metrics.
+- SQLite deployment may become a bottleneck for very large TG storage indexes; migration path to PostgreSQL should be considered.
+- No clear database migration workflow was confirmed; schema changes may depend on application startup.
+- Deployment proxy container exists, but runtime selection and application integration need further verification.
 
 ## P2
 
@@ -53,3 +57,9 @@ Tracked during code review.
 - Frontend currently covers account creation, source creation, and resource listing validation flows.
 - Account update/delete and source update/delete handlers exist in JavaScript but are not represented as complete UI workflows.
 - Network plugin management exists at API level but has no complete frontend operations panel.
+
+## Database and deployment review notes
+
+- Current database initialization creates SQLite tables at runtime and enables WAL mode.
+- Docker deployment provides persistent /data volume and optional proxy profile.
+- Production migration, backup, scaling, and database upgrade strategy require formal documentation.
