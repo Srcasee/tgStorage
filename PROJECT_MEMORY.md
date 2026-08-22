@@ -48,6 +48,7 @@ Network Plugin
 - Admin、Database、Deployment 基础能力存在。
 - 下载子系统组件较完整，但职责边界未稳定。
 - 未来下载子系统倾向直接重写，不继续在旧链路上无限修补。
+- 网络边界调整：所有 Telegram 账号统一使用同一网络策略，不再设计账号级独立代理绑定。
 
 ---
 
@@ -62,6 +63,7 @@ Network Plugin
 - Factory 负责 provider 装配的方向。
 - Provider 抽象方向。
 - Message cache adapter 解耦方向。
+- NetworkPlugin 作为全局网络能力入口。
 
 ## 需要重写
 
@@ -82,6 +84,7 @@ Network Plugin
 - ChunkMerger 只能保证排序，不能保证数据完整性。
 - providers.py 抽象存在，但接口仍暴露 Telegram 细节。
 - merger.py 与 chunk_merger.py 存在重复职责。
+- NetworkPlugin 已支持插件注册/选择，但当前主要服务于 Telegram client 创建阶段，未参与下载策略决策。
 
 ---
 
@@ -89,17 +92,17 @@ Network Plugin
 
 已确认：
 
-- Telegram Runtime 基础抽象
-- Network Plugin 加载入口
-- Resource/Search 链路
-- Admin API
-- Alembic migration
-- GitHub Actions
-- pytest 基础设施
-- Docker production compose
-- Download HTTP Range
-- Download contract tests
-- Chunk 基础组件
+- Telegram Runtime 基础抽象。
+- Network Plugin 加载入口。
+- Resource/Search 链路。
+- Admin API。
+- Alembic migration。
+- GitHub Actions。
+- pytest 基础设施。
+- Docker production compose。
+- Download HTTP Range。
+- Download contract tests。
+- Chunk 基础组件。
 
 ---
 
@@ -118,9 +121,32 @@ Network Plugin
 - ResourceResolver 与具体 backend 耦合。
 - DownloadManager / Engine / Scheduler 边界需要重新设计。
 - 核心 Chunk 调度路径缺少测试覆盖。
-- Network Plugin 与 Account Profile 未闭环。
+- Network Plugin 与 Download Task 未闭环。
 - Provider 接口需要升级为通用 Backend 接口。
 - Merger 存在重复实现。
+
+---
+
+# 5. 网络策略决策
+
+已确定：
+
+- 所有 Telegram 账号共享同一网络策略。
+- Proxy 不再设计为账号级独立配置。
+- NetworkPlugin 保留为系统级热插拔能力。
+- Download v2 只需要选择网络策略，不需要选择账号网络。
+
+目标：
+
+```
+System Network Policy
+        |
+        v
+Telegram Runtime
+        |
+        v
+All Accounts
+```
 
 ---
 
@@ -135,9 +161,9 @@ Network Plugin
 - scripts
 - requirements
 - app/download 初步逆向架构审查
+- Telegram Runtime → Network Plugin → Download Backend 边界审查
 
 当前继续：
 
-- app/download 剩余模块审查
-- 输出 KEEP / REWRITE / DELETE 分类
+- app/download KEEP / REWRITE / DELETE 分类
 - 设计 download v2 架构
