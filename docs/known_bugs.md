@@ -38,7 +38,7 @@ Additional confirmation:
 - Deployment proxy runtime integration with NetworkPlugin requires verification.
 - CI exists, but needs stronger quality gates such as linting and static checks.
 - Regression coverage exists for admin, download contracts, headers, runtime validation, and indexer validation, but core acceleration paths still lack sufficient coverage.
-- requirements.txt contains runtime dependencies, but developer tooling dependencies need separate verification.
+- requirements-dev.txt confirms pytest, pytest-asyncio, pytest-cov, ruff and mypy tooling exists; CI execution of these checks requires verification.
 
 ## P2
 
@@ -62,6 +62,7 @@ Reviewed:
 - docker-entrypoint.sh
 - scripts/
 - requirements.txt
+- requirements-dev.txt
 
 Confirmed:
 
@@ -70,9 +71,10 @@ Confirmed:
 - Optional proxy deployment profile exists.
 - Container startup performs Alembic migration.
 - scripts/index_telegram_source.py uses runtime provider.
+- requirements-dev.txt provides developer testing and quality tool dependencies.
 
 Remaining review targets:
 
 - tests download path depth
-- requirements-dev/tooling
+- CI quality gate execution
 - final architecture validation
