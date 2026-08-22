@@ -60,6 +60,8 @@ Network Plugin
 - ChunkRange / ChunkManager 的分片思想。
 - DownloadRuntime / Engine 的策略隔离方向。
 - Factory 负责 provider 装配的方向。
+- Provider 抽象方向。
+- Message cache adapter 解耦方向。
 
 ## 需要重写
 
@@ -68,6 +70,7 @@ Network Plugin
 - DownloadManager 到 Chunk Engine 的生产链路。
 - Account 调度策略。
 - ChunkMerger 完整性处理。
+- Telegram backend 直接绑定的执行接口。
 
 ## 当前确认问题
 
@@ -77,6 +80,8 @@ Network Plugin
 - AccountSelector 只有 enabled 检查，没有速度、负载、失败状态调度。
 - ResourceResolver 与 Telegram backend 耦合，需要抽象 ResourceLocation。
 - ChunkMerger 只能保证排序，不能保证数据完整性。
+- providers.py 抽象存在，但接口仍暴露 Telegram 细节。
+- merger.py 与 chunk_merger.py 存在重复职责。
 
 ---
 
@@ -114,6 +119,8 @@ Network Plugin
 - DownloadManager / Engine / Scheduler 边界需要重新设计。
 - 核心 Chunk 调度路径缺少测试覆盖。
 - Network Plugin 与 Account Profile 未闭环。
+- Provider 接口需要升级为通用 Backend 接口。
+- Merger 存在重复实现。
 
 ---
 
