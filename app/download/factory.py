@@ -9,18 +9,19 @@ from __future__ import annotations
 from app.download.backend.telegram_backend import TelegramBackend
 from app.download.service import DownloadService
 from app.telegram.client_provider import DatabaseTelegramClientProvider
+from app.telegram.runtime_registry import get_pool, get_runtime
 
 
-def create_download_service(session, runtime, pool) -> DownloadService:
+def create_download_service(session) -> DownloadService:
     """Create the application download service.
 
-    Telegram runtime dependencies are assembled here and are hidden from API
-    callers.
+    Runtime and Telegram client dependencies are assembled here. Callers only
+    provide application persistence context and receive a download service.
     """
     provider = DatabaseTelegramClientProvider(
         session=session,
-        runtime=runtime,
-        pool=pool,
+        runtime=get_runtime(),
+        pool=get_pool(),
     )
     backend = TelegramBackend(
         provider,
