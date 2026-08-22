@@ -48,9 +48,23 @@ Tracked during code review.
 - Download API supports HTTP Range delivery.
 - Admin API provides account, source, resource, and network management foundations.
 
-## Additional files requiring review
+## Supplemental review completed
 
+Reviewed:
+
+- tests/
 - docker-compose.prod.yml
 - docker-entrypoint.sh
+
+Confirmed:
+
+- pytest infrastructure exists.
+- Production compose exists.
+- Optional proxy deployment profile exists.
+- Container startup performs Alembic migration.
+
+Remaining review targets:
+
 - scripts/
 - requirements
+- final architecture validation
