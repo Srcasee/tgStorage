@@ -1,7 +1,7 @@
 """Telegram source ORM model."""
 
 from sqlalchemy import BigInteger, Boolean, Index, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -32,3 +32,5 @@ class TelegramSource(Base):
 
     # Incremental cursor scoped to this exact source identity.
     last_scanned_message_id: Mapped[int] = mapped_column(BigInteger, default=0)
+
+    resources = relationship("Resource", back_populates="source")
