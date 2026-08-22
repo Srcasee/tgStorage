@@ -20,13 +20,11 @@ class TelegramBackend(DownloadBackend):
         offset: int = 0,
         limit: int | None = None,
         chunk_size: int = 256 * 1024,
-        account_id: int | None = None,
     ) -> AsyncIterator[bytes]:
         async for chunk in self.runtime_adapter.stream(
             location,
             offset=offset,
             limit=limit,
             chunk_size=chunk_size,
-            account_id=account_id,
         ):
             yield chunk
