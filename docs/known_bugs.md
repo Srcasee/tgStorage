@@ -32,8 +32,8 @@ Tracked during code review.
 - Admin frontend lacks Telegram runtime status and download metrics display.
 - SQLite may become a scaling bottleneck for very large TG indexes.
 - Deployment proxy runtime integration with NetworkPlugin requires verification.
-- Automated regression coverage for download, Telegram runtime, API, and indexing paths is insufficient.
-- CI exists, but needs stronger quality gates such as test execution coverage, linting, and static checks.
+- CI exists, but needs stronger quality gates such as linting and static checks.
+- Regression coverage exists for admin, download contracts, headers, runtime validation, and indexer validation, but core acceleration paths still lack sufficient coverage.
 
 ## P2
 
@@ -50,9 +50,6 @@ Tracked during code review.
 
 ## Additional files requiring review
 
-- .github/workflows/
-- alembic/
-- tests/
 - docker-compose.prod.yml
 - docker-entrypoint.sh
 - scripts/
