@@ -1,14 +1,13 @@
 services:
   telegram-drive:
-    container_name: telegram-drive
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     working_dir: /app
     volumes:
-      - ./app:/app
       - ./data:/data
+      - ./app:/app/app
     env_file:
       - .env
     ports:
@@ -28,7 +27,6 @@ services:
 
   proxy:
     image: ghcr.io/sagernet/sing-box:latest
-    container_name: telegram-drive-proxy
     restart: unless-stopped
     profiles:
       - proxy
