@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db_session
-from app.download.factory import create_download_service
+from app.core.dependencies import get_db_session, get_download_service
 from app.download.providers import ResourceLocation
 from app.download.resource_resolver import ResourceResolver
+from app.download.service import DownloadService
 
 router = APIRouter(tags=["download"])
 
@@ -45,6 +45,7 @@ async def download_resource(
     resource_id: int,
     range_header: str | None = Header(default=None, alias="Range"),
     session: AsyncSession = Depends(get_db_session),
+    service: DownloadService = Depends(get_download_service),
 ):
     resolver = ResourceResolver(session)
     try:
@@ -55,8 +56,6 @@ async def download_resource(
     size = location.size
     byte_range = _parse_range(range_header, size)
     start, end = byte_range or (0, size - 1)
-
-    service = await create_download_service(session)
 
     resource = ResourceLocation(
         resource_id=str(location.resource_id),
