@@ -56,7 +56,7 @@ async def download_resource(
     byte_range = _parse_range(range_header, size)
     start, end = byte_range or (0, size - 1)
 
-    service = create_download_service(session)
+    service = await create_download_service(session)
 
     resource = ResourceLocation(
         resource_id=str(location.resource_id),
