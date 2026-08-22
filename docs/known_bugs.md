@@ -28,6 +28,8 @@ Tracked during code review.
 - SQLite deployment may become a bottleneck for very large TG storage indexes; migration path to PostgreSQL should be considered.
 - No clear database migration workflow was confirmed; schema changes may depend on application startup.
 - Deployment proxy container exists, but runtime selection and application integration need further verification.
+- Automated test coverage was not found during repository scan; core download, Telegram runtime, API, and indexing paths lack confirmed regression tests.
+- CI/CD workflow configuration was not found during repository scan; automated quality gates and deployment checks need to be established.
 
 ## P2
 
@@ -63,3 +65,9 @@ Tracked during code review.
 - Current database initialization creates SQLite tables at runtime and enables WAL mode.
 - Docker deployment provides persistent /data volume and optional proxy profile.
 - Production migration, backup, scaling, and database upgrade strategy require formal documentation.
+
+## Test and CI review notes
+
+- Repository scan did not identify a test suite or pytest-based regression framework.
+- No GitHub Actions workflow was identified for automated checks.
+- Before large refactoring, add tests around Resource indexing, Telegram client lifecycle, DownloadManager routing, Range streaming, and Admin API permissions.
